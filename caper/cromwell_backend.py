@@ -56,7 +56,7 @@ class CromwellBackendCommon(UserDict):
         'services': {
             'LoadController': {
                 'class': 'cromwell.services.loadcontroller.impl'
-                '.LoadControllerServiceActor',
+                         '.LoadControllerServiceActor',
                 'config': {
                     # added due to issues on stanford sherlock/scg
                     'control-frequency': '21474834 seconds'
@@ -295,23 +295,27 @@ class CromwellBackendGcp(CromwellBackendBase):
     TEMPLATE_BACKEND = {
         'config': {
             'default-runtime-attributes': {},
-            'genomics-api-queries-per-100-seconds': 1000,
             'maximum-polling-interval': 600,
             'localization-attempts': 3,
             'genomics': {
-                'restrict-metadata-access': False,
                 'compute-service-account': 'default',
             },
         }
     }
-    ACTOR_FACTORY_V2ALPHA = (
-        'cromwell.backend.google.pipelines.v2alpha1.PipelinesApiLifecycleActorFactory'
-    )
+
     ACTOR_FACTORY_V2BETA = (
         'cromwell.backend.google.pipelines.v2beta.PipelinesApiLifecycleActorFactory'
     )
-    GENOMICS_ENDPOINT_V2ALPHA = 'https://genomics.googleapis.com/'
+    ACTOR_FACTORY_BATCH = (
+        'cromwell.backend.google.batch.GcpBatchBackendLifecycleActorFactory'
+    )
     GENOMICS_ENDPOINT_V2BETA = 'https://lifesciences.googleapis.com/'
+    LIFE_SCIENCES_CONFIG_OPTIONS = {
+        'genomics-api-queries-per-100-seconds': 1000,
+        'genomics': {
+            'restrict-metadata-access': False,
+        }
+    }
     DEFAULT_REGION = 'us-central1'
     DEFAULT_CALL_CACHING_DUP_STRAT = CALL_CACHING_DUP_STRAT_REFERENCE
 
@@ -320,6 +324,7 @@ class CromwellBackendGcp(CromwellBackendBase):
         gcp_prj,
         gcp_out_dir,
         gcp_service_account_key_json=None,
+        use_google_batch=True,
         use_google_cloud_life_sciences=False,
         gcp_region=DEFAULT_REGION,
         gcp_zones=None,
@@ -331,6 +336,9 @@ class CromwellBackendGcp(CromwellBackendBase):
             gcp_service_account_key_json:
                 Use this key JSON file to use service_account scheme
                 instead of application_default.
+            use_google_batch:
+                Use Google Cloud Batch API instead of the deprecated
+                Life Sciences API.
             use_google_cloud_life_sciences:
                 Use Google Cloud Life Sciences API (v2beta) instead of
                 deprecated Genomics API (v2alpha1).
@@ -350,6 +358,11 @@ class CromwellBackendGcp(CromwellBackendBase):
                 )
             )
 
+        if use_google_batch and use_google_cloud_life_sciences:
+            raise ValueError(
+                'use_google_batch and use_google_cloud_life_sciences cannot be both True.'
+            )
+
         super().__init__(
             backend_name=BACKEND_GCP,
             max_concurrent_tasks=max_concurrent_tasks,
@@ -358,11 +371,14 @@ class CromwellBackendGcp(CromwellBackendBase):
         )
         merge_dict(self.data, CromwellBackendGcp.TEMPLATE)
         self.merge_backend(CromwellBackendGcp.TEMPLATE_BACKEND)
+        if use_google_cloud_life_sciences:
+            merge_dict(self.backend_config, CromwellBackendGcp.LIFE_SCIENCES_CONFIG_OPTIONS)
 
         config = self.backend_config
         genomics = config['genomics']
         filesystems = config['filesystems']
 
+        genomics['location'] = gcp_region
         if gcp_service_account_key_json:
             genomics['auth'] = 'service-account'
             filesystems[FILESYSTEM_GCS]['auth'] = 'service-account'
@@ -391,12 +407,10 @@ class CromwellBackendGcp(CromwellBackendBase):
         if use_google_cloud_life_sciences:
             self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_V2BETA
             genomics['endpoint-url'] = CromwellBackendGcp.GENOMICS_ENDPOINT_V2BETA
-            genomics['location'] = gcp_region
         else:
-            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_V2ALPHA
-            genomics['endpoint-url'] = CromwellBackendGcp.GENOMICS_ENDPOINT_V2ALPHA
+            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
             if gcp_zones:
-                self.default_runtime_attributes['zones'] = ' '.join(gcp_zones)
+                self.default_runtime_attributes['zones'] = gcp_zones
 
         config['project'] = gcp_prj
         self['engine']['filesystems'][FILESYSTEM_GCS]['project'] = gcp_prj
