@@ -297,25 +297,13 @@ class CromwellBackendGcp(CromwellBackendBase):
             'default-runtime-attributes': {},
             'maximum-polling-interval': 600,
             'localization-attempts': 3,
-            'genomics': {
-                'compute-service-account': 'default',
-            },
+            'batch': {}
         }
     }
 
-    ACTOR_FACTORY_V2BETA = (
-        'cromwell.backend.google.pipelines.v2beta.PipelinesApiLifecycleActorFactory'
-    )
     ACTOR_FACTORY_BATCH = (
         'cromwell.backend.google.batch.GcpBatchBackendLifecycleActorFactory'
     )
-    GENOMICS_ENDPOINT_V2BETA = 'https://lifesciences.googleapis.com/'
-    LIFE_SCIENCES_CONFIG_OPTIONS = {
-        'genomics-api-queries-per-100-seconds': 1000,
-        'genomics': {
-            'restrict-metadata-access': False,
-        }
-    }
     DEFAULT_REGION = 'us-central1'
     DEFAULT_CALL_CACHING_DUP_STRAT = CALL_CACHING_DUP_STRAT_REFERENCE
 
@@ -324,10 +312,7 @@ class CromwellBackendGcp(CromwellBackendBase):
         gcp_prj,
         gcp_out_dir,
         gcp_service_account_key_json=None,
-        use_google_batch=True,
-        use_google_cloud_life_sciences=False,
         gcp_region=DEFAULT_REGION,
-        gcp_zones=None,
         max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
         call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
     ):
@@ -358,11 +343,6 @@ class CromwellBackendGcp(CromwellBackendBase):
                 )
             )
 
-        if use_google_batch and use_google_cloud_life_sciences:
-            raise ValueError(
-                'use_google_batch and use_google_cloud_life_sciences cannot be both True.'
-            )
-
         super().__init__(
             backend_name=BACKEND_GCP,
             max_concurrent_tasks=max_concurrent_tasks,
@@ -371,16 +351,13 @@ class CromwellBackendGcp(CromwellBackendBase):
         )
         merge_dict(self.data, CromwellBackendGcp.TEMPLATE)
         self.merge_backend(CromwellBackendGcp.TEMPLATE_BACKEND)
-        if use_google_cloud_life_sciences:
-            merge_dict(self.backend_config, CromwellBackendGcp.LIFE_SCIENCES_CONFIG_OPTIONS)
 
         config = self.backend_config
-        genomics = config['genomics']
+        batch = config['batch']
         filesystems = config['filesystems']
 
-        genomics['location'] = gcp_region
+        batch['location'] = gcp_region
         if gcp_service_account_key_json:
-            genomics['auth'] = 'service-account'
             filesystems[FILESYSTEM_GCS]['auth'] = 'service-account'
             self['google']['auths'] = [
                 {
@@ -392,10 +369,10 @@ class CromwellBackendGcp(CromwellBackendBase):
             # parse service account key JSON to get client_email.
             with open(gcp_service_account_key_json) as fp:
                 key_json = json.loads(fp.read())
-            genomics['compute-service-account'] = key_json['client_email']
+            batch['compute-service-account'] = key_json['client_email']
             self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = 'service-account'
         else:
-            genomics['auth'] = 'application-default'
+            batch['auth'] = 'application-default'
             filesystems[FILESYSTEM_GCS]['auth'] = 'application-default'
             self['google']['auths'] = [
                 {'name': 'application-default', 'scheme': 'application_default'}
@@ -404,13 +381,7 @@ class CromwellBackendGcp(CromwellBackendBase):
                 'auth'
             ] = 'application-default'
 
-        if use_google_cloud_life_sciences:
-            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_V2BETA
-            genomics['endpoint-url'] = CromwellBackendGcp.GENOMICS_ENDPOINT_V2BETA
-        else:
-            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
-            if gcp_zones:
-                self.default_runtime_attributes['zones'] = gcp_zones
+        self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
 
         config['project'] = gcp_prj
         self['engine']['filesystems'][FILESYSTEM_GCS]['project'] = gcp_prj
