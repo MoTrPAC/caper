@@ -10,7 +10,6 @@ from caper.cromwell_backend import BACKEND_AWS, BACKEND_GCP
 
 def test_create_file(tmp_path):
     """Test without docker/singularity."""
-    use_google_cloud_life_sciences = False
     gcp_zones = ['us-west-1', 'us-west-2']
     slurm_partition = 'my_partition'
     slurm_account = 'my_account'
@@ -24,7 +23,6 @@ def test_create_file(tmp_path):
     lsf_extra_param = 'my_extra_param'
 
     co = CaperWorkflowOpts(
-        use_google_cloud_life_sciences=use_google_cloud_life_sciences,
         gcp_zones=gcp_zones,
         slurm_partition=slurm_partition,
         slurm_account=slurm_account,
@@ -113,13 +111,12 @@ def test_create_file(tmp_path):
     assert d['monitoring_script'] == gcp_monitoring_script
 
 
-def test_create_file_with_google_cloud_life_sciences(tmp_path):
-    """Test with use_google_cloud_life_sciences flag.
-    zones should not be written to dra.
+def test_create_file_google_cloud(tmp_path):
+    """Test with Batch. zones should be written to default_runtime_attributes.
     """
     gcp_zones = ['us-west-1', 'us-west-2']
 
-    co = CaperWorkflowOpts(use_google_cloud_life_sciences=True, gcp_zones=gcp_zones)
+    co = CaperWorkflowOpts(gcp_zones=gcp_zones)
 
     wdl = tmp_path / 'test.wdl'
     wdl.write_text('')
@@ -130,7 +127,7 @@ def test_create_file_with_google_cloud_life_sciences(tmp_path):
         d = json.loads(fp.read())
 
     dra = d[CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES]
-    assert 'zones' not in dra
+    assert 'zones' in dra
 
 
 def test_create_file_docker(tmp_path):

@@ -101,7 +101,7 @@ def get_parser_and_defaults(conf_file=None):
         help='Secret key JSON file for Google Cloud Platform service account. '
         'This service account should have enough permission to '
         'Storage for client functions and '
-        'Storage/Compute Engine/Genomics API/Life Sciences API '
+        'Storage/Compute Engine/Batch API '
         'for server/runner functions.',
     )
 
@@ -323,29 +323,16 @@ def get_parser_and_defaults(conf_file=None):
     group_gc = parent_runner.add_argument_group(
         title='GCP backend arguments for server/runner'
     )
-    group_gc.add_argument('--gcp-prj', help='GC project')
-    group_gc_all.add_argument(
-        '--use-google-cloud-life-sciences',
-        action='store_true',
-        help='Use Google Cloud Life Sciences API (v2beta) instead of '
-        'deprecated Genomics API (v2alpha1).'
-        'Life Sciences API requires only one region specified with'
-        'gcp-region. gcp-zones will be ignored since it is for Genomics API.'
-        'See https://cloud.google.com/life-sciences/docs/concepts/locations '
-        'for supported regions.',
-    )
+    group_gc.add_argument('--gcp-prj', help='Google Cloud project')
     group_gc.add_argument(
         '--gcp-region',
         default=CromwellBackendGcp.DEFAULT_REGION,
-        help='GCP region for Google Cloud Life Sciences API. '
-        'This is used only when --use-google-cloud-life-sciences is defined.',
+        help='GCP region for Google Cloud Batch API. ',
     )
     group_gc_all.add_argument(
         '--gcp-zones',
-        help='Comma-separated GCP zones used for Genomics API. '
+        help='Comma-separated GCP zones used for Running jobs in Batch. '
         '(e.g. us-west1-b,us-central1-b). '
-        'If you use --use-google-cloud-life-sciences then '
-        'define --gcp-region instead.',
     )
     group_gc.add_argument(
         '--gcp-call-caching-dup-strat',
