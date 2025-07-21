@@ -1,0 +1,90 @@
+name: Pytest
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  pytest:
+    runs-on: linux-self-hosted
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure GCP credentials
+        id: google-auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Python 3.12
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv on Linux or macOS
+        run: curl -sSfL https://astral.sh/uv/install.sh | bash
+
+      - name: Find uv cache and compute cache suffix
+        run: |
+          {
+            echo "UV_CACHE=$(uv cache dir)"
+            echo "HASH_CACHE_SUFFIX=-${{ hashFiles('pyproject.toml') }}"
+          } >> $GITHUB_ENV
+
+      - name: Load uv cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE }}
+          key: |
+            uv-cache-${{ env.HASH_CACHE_SUFFIX }}
+            uv-cache
+
+      - name: Setup a venv
+        working-directory: server
+        run: |
+          uv venv
+          # write venv path to GITHUB_ENV
+          echo "VIRTUAL_ENV=$(pwd)/.venv" >> $GITHUB_ENV
+          echo "$(pwd)/.venv/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        working-directory: server
+        run: uv sync --all-groups --all-extras
+
+      - name: Run pytest
+        env:
+          GCS_ROOT: ${{ secrets.GCS_ROOT }}
+          GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
+        run: |
+          cd tests/
+          
+          # run pytest
+          pytest --ci-prefix ${{ github.run_id }} \
+                 --gcs-root ${GCS_ROOT} \
+                 --gcp-prj ${GOOGLE_PROJECT_ID} \
+                 --debug-caper \
+                 -vv -s
+          
+          # auth for gsutil
+          export GOOGLE_CLOUD_PROJECT=${GOOGLE_PROJECT_ID}
+          export BOTO_CONFIG=/dev/null
+          
+          # clean up
+          rm -f tmp_key.json
+          gsutil -m rm -rf ${GCS_ROOT}/caper_out/${{ github.run_id }} || true
