@@ -1,8 +1,6 @@
 ## Introduction
 
-`create_instance.sh` will create an instance on Google Cloud Compute Engine in Google your project and configure the instance for Caper with PostgreSQL database and Google Cloud Life Sciences API (`v2beta`).
-
-> **NOTE**: Google Cloud Life Sciences API is a new API replacing the old deprecating Genomics API (`v2alpha1`). It requires `--gcp-region` to be defined correctly. Check [supported regions](https://cloud.google.com/life-sciences/docs/concepts/locations) for the new API.
+`create_instance.sh` will create an instance on Google Cloud Compute Engine in Google your project and configure the instance for Caper with PostgreSQL database and Google Cloud Batch API.
 
 ## Install Google Cloud SDK SLI
 
@@ -12,12 +10,12 @@ Go to [APIs & Services](https://console.cloud.google.com/apis/dashboard) on your
 * Compute Engine API
 * Cloud Storage: DO NOT click on `Create credentials`.
 * Cloud Storage JSON API
-* Google Cloud Life Sciences API
+* Google Cloud Batch API
 
 Go to [Service accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) on your project and create a new service account with the following roles:
 * Compute Admin
 * Storage Admin: You can skip this and individually configure permission on each bucket on the project.
-* Cloud Life Sciences Admin (Cromwell's PAPI v2beta)
+* Cloud Batch Admin
 * **Service Account User** (VERY IMPORTANT).
 
 Generate a secret key JSON from the service account and keep it locally on your computer.
@@ -26,7 +24,7 @@ Generate a secret key JSON from the service account and keep it locally on your 
 
 ## How to create an instance
 
-Run without arguments to see detailed help. Some optional arguments are very important depending on your region/zone. e.g. `--gcp-region` (for provisioning worker instances of Life Sciences API) and `--zone` (for server instance creation only). These regional parameters default to US central region/zones.
+Run without arguments to see detailed help. Some optional arguments are very important depending on your region/zone. e.g. `--gcp-region` (for provisioning worker instances of Batch API) and `--zone` (for server instance creation only). These regional parameters default to US central region/zones.
 ```bash
 $ bash create_instance.sh
 ```
