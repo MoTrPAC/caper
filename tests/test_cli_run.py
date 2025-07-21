@@ -105,7 +105,7 @@ def test_run(tmp_path, cromwell, womtool, debug_caper):
 
 @pytest.mark.google_cloud
 @pytest.mark.integration
-def test_run_gcp_with_life_sciences_api(
+def test_run_gcp_batch_api(
     tmp_path,
     gcs_root,
     ci_prefix,
@@ -130,7 +130,6 @@ def test_run_gcp_with_life_sciences_api(
     cmd += ['-m', str(metadata)]
     if gcp_service_account_key_json:
         cmd += ['--gcp-service-account-key-json', gcp_service_account_key_json]
-    cmd += ['--use-google-cloud-life-sciences']
     cmd += ['--gcp-region', 'us-central1']
     # --gcp-zones should be ignored
     cmd += ['--gcp-zones', 'us-west1-a,us-west1-b']

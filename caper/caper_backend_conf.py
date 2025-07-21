@@ -56,14 +56,11 @@ class CaperBackendConf:
         gcp_out_dir=None,
         gcp_call_caching_dup_strat=CromwellBackendGcp.DEFAULT_CALL_CACHING_DUP_STRAT,
         gcp_service_account_key_json=None,
-        use_google_cloud_life_sciences=False,
-        use_google_batch=True,
         gcp_region=CromwellBackendGcp.DEFAULT_REGION,
         aws_batch_arn=None,
         aws_region=None,
         aws_out_dir=None,
         aws_call_caching_dup_strat=CromwellBackendAws.DEFAULT_CALL_CACHING_DUP_STRAT,
-        gcp_zones=None,
         slurm_partition=None,
         slurm_account=None,
         slurm_extra_param=None,
@@ -145,17 +142,8 @@ class CaperBackendConf:
                 GCP service account key JSON.
                 If defined, service_account scheme will be used instead of application_default
                 in Cromwell.
-            use_google_cloud_life_sciences:
-                Use Google Cloud Life Sciences API.
-                This requires only one zone specified in gcp_zones.
-                If not specified default zone will be used.
-                See Cromwell document:
-                    https://cromwell.readthedocs.io/en/stable/backends/Google/.
-                Also check supported zones:
-                    https://cloud.google.com/life-sciences/docs/concepts/locations
             gcp_region:
-                Region for Google Cloud Life Sciences API.
-                Ignored if not use_google_cloud_life_sciences.
+                Region for Google Cloud Batch API.
             aws_batch_arn:
                 ARN for AWS Batch.
             aws_region:
@@ -164,13 +152,6 @@ class CaperBackendConf:
                 Output bucket path for aws backend. Must start with s3://.
             aws_call_caching_dup_strat:
                 Call-caching duplication strategy for AWS backend.
-            gcp_zones:
-                List of zones for Google Cloud Genomics API.
-                For this and all arguments below this,
-                see details in CaperWorkflowOpts.__init__.
-                These parameters can be defined either in a backend conf file or
-                in a workflow options JSON file.
-                One major difference is that the former will also be used as defaults.
             slurm_partition:
             slurm_account:
             slurm_extra_param:
@@ -307,10 +288,7 @@ class CaperBackendConf:
                     gcp_out_dir=gcp_out_dir,
                     call_caching_dup_strat=gcp_call_caching_dup_strat,
                     gcp_service_account_key_json=gcp_service_account_key_json,
-                    use_google_batch=use_google_batch,
-                    use_google_cloud_life_sciences=use_google_cloud_life_sciences,
                     gcp_region=gcp_region,
-                    gcp_zones=gcp_zones,
                 ),
             )
 
