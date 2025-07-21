@@ -16,7 +16,7 @@ if [[ $# -lt 1 ]]; then
   echo
   echo "Optional arguments for Caper:"
   echo "  -l, --gcp-loc-dir: gs:// bucket dir path for localization."
-  echo "  --gcp-region: Region for Google Life Sciences API. us-central1 by default. CHECK SUPPORTED REGIONS. This is different from --zone, which is used for instance creation only. us-central1 by default."
+  echo "  --gcp-region: Region for Google Cloud Batch API. us-central1 by default. CHECK SUPPORTED REGIONS. This is different from --zone, which is used for instance creation only. us-central1 by default."
   echo "  --postgresql-db-ip: localhost by default."
   echo "  --postgresql-db-port: 5432 by default."
   echo "  --postgresql-db-user: cromwell by default."
@@ -260,7 +260,6 @@ gcp-region=$GCP_REGION
 gcp-out-dir=$GCP_OUT_DIR
 gcp-loc-dir=$GCP_LOC_DIR
 gcp-service-account-key-json=$REMOTE_KEY_FILE
-use-google-cloud-life-sciences=True
 # metadata DB
 db=postgresql
 postgresql-db-ip=$POSTGRESQL_DB_IP

@@ -187,8 +187,6 @@ We highly recommend to use a default configuration file described in the section
 	**Conf. file**|**Cmd. line**|**Description**
 	:-----|:-----|:-----
 	gcp-prj|--gcp-prj|Google Cloud project
-	use-google-cloud-life-sciences|--use-google-cloud-life-sciences|Use Google Cloud Life Sciences API instead of (deprecated) Genomics API
-	gcp-zones|--gcp-zones|Comma-delimited Google Cloud Platform zones to provision worker instances (e.g. us-central1-c,us-west1-b)
 	gcp-out-dir, out-gcs-bucket|--gcp-out-dir, --out-gcs-bucket|Output `gs://` directory for GC backend
 	gcp-loc-dir, tmp-gcs-bucket|--gcp-loc-dir, --tmp-gcs-bucket|Tmp. directory for localization on GC backend
 	gcp-call-caching-dup-strat|--gcp-call-caching-dup-strat|Call-caching duplication strategy. Choose between `copy` and `reference`. `copy` will make a copy for a new workflow, `reference` will make refer to the call-cached output of a previous workflow in `metadata.json`. Defaults to `reference`
