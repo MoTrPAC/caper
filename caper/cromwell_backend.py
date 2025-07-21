@@ -321,17 +321,8 @@ class CromwellBackendGcp(CromwellBackendBase):
             gcp_service_account_key_json:
                 Use this key JSON file to use service_account scheme
                 instead of application_default.
-            use_google_batch:
-                Use Google Cloud Batch API instead of the deprecated
-                Life Sciences API.
-            use_google_cloud_life_sciences:
-                Use Google Cloud Life Sciences API (v2beta) instead of
-                deprecated Genomics API (v2alpha1).
             gcp_region:
-                Region for Google Cloud Life Sciences API.
-            gcp_zones:
-                List of zones for Genomics API.
-                Ignored if use_google_cloud_life_sciences.
+                Region for Google Cloud Batch API.
         """
         if call_caching_dup_strat not in (
             CALL_CACHING_DUP_STRAT_REFERENCE,
