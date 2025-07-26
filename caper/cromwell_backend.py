@@ -307,6 +307,9 @@ class CromwellBackendGcp(CromwellBackendBase):
     DEFAULT_REGION = 'us-central1'
     DEFAULT_CALL_CACHING_DUP_STRAT = CALL_CACHING_DUP_STRAT_REFERENCE
 
+    LOGGING_POLICY_GOOGLE_CLOUD_STORAGE = "PATH"
+    LOGGING_POLICY_GOOGLE_CLOUD_LOGGING = "LOGGING"
+
     def __init__(
         self,
         gcp_prj,
@@ -314,6 +317,7 @@ class CromwellBackendGcp(CromwellBackendBase):
         gcp_service_account_key_json=None,
         gcp_compute_service_account=None,
         gcp_region=DEFAULT_REGION,
+        gcp_logging_policy=LOGGING_POLICY_GOOGLE_CLOUD_STORAGE,
         max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
         call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
     ):
@@ -354,6 +358,7 @@ class CromwellBackendGcp(CromwellBackendBase):
         filesystems = config['filesystems']
 
         batch['location'] = gcp_region
+        batch['logs-policy'] = gcp_logging_policy
         if gcp_service_account_key_json:
             filesystems[FILESYSTEM_GCS]['auth'] = 'service-account'
             self['google']['auths'] = [
