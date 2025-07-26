@@ -12,7 +12,7 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         '--gcs-root',
-        default='gs://encode-test-caper',
+        default='gs://omicspipelines-test-caper',
         help='GCS root path for CI test. '
         'This GCS bucket must be publicly accessible '
         '(read access for everyone is enough for testing).',
@@ -28,10 +28,13 @@ def pytest_addoption(parser):
         help='URI for Womtool JAR. Local path is recommended.',
     )
     parser.addoption(
-        '--gcp-prj', default='encode-dcc-1016', help='Project on Google Cloud Platform.'
+        '--gcp-prj', default='motrpac-portal-dev', help='Project on Google Cloud Platform.'
     )
     parser.addoption(
         '--gcp-service-account-key-json', help='JSON key file for GCP service account.'
+    )
+    parser.addoption(
+        '--gcp-compute-service-account', help='Service account for Google Compute Engine.'
     )
     parser.addoption(
         '--debug-caper', action='store_true', help='Debug-level logging for CLI tests.'
@@ -67,6 +70,12 @@ def gcp_prj(request):
 @pytest.fixture(scope='session')
 def gcp_service_account_key_json(request):
     return request.config.getoption('--gcp-service-account-key-json')
+
+@pytest.fixture(scope='session')
+def gcp_compute_service_account(request):
+    return request.config.getoption(
+        '--gcp-compute-service-account'
+    )
 
 
 @pytest.fixture(scope='session')
