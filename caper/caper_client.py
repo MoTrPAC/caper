@@ -150,6 +150,7 @@ class CaperClientSubmit(CaperClient):
         gcp_loc_dir=None,
         aws_loc_dir=None,
         gcp_service_account_key_json=None,
+        gcp_compute_service_account=None,
         server_hostname=CromwellRestAPI.DEFAULT_HOSTNAME,
         server_port=CromwellRestAPI.DEFAULT_PORT,
         server_heartbeat=None,
@@ -208,6 +209,7 @@ class CaperClientSubmit(CaperClient):
 
         self._caper_workflow_opts = CaperWorkflowOpts(
             gcp_zones=gcp_zones,
+            gcp_compute_service_account=gcp_compute_service_account,
             slurm_partition=slurm_partition,
             slurm_account=slurm_account,
             slurm_extra_param=slurm_extra_param,

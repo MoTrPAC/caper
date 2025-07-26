@@ -99,10 +99,9 @@ def get_parser_and_defaults(conf_file=None):
     parent_all.add_argument(
         '--gcp-service-account-key-json',
         help='Secret key JSON file for Google Cloud Platform service account. '
-        'This service account should have enough permission to '
-        'Storage for client functions and '
-        'Storage/Compute Engine/Batch API '
-        'for server/runner functions.',
+        'This service account should have enough permission to Storage for client '
+        'functions and Storage/Compute Engine/Batch API for server/runner functions. ' 
+        'We recommend using application default credentials for authentication.',
     )
 
     group_loc = parent_all.add_argument_group(
@@ -328,6 +327,14 @@ def get_parser_and_defaults(conf_file=None):
         '--gcp-region',
         default=CromwellBackendGcp.DEFAULT_REGION,
         help='GCP region for Google Cloud Batch API. ',
+    )
+    group_gc.add_argument(
+        '--gcp-compute-service-account',
+        help='Service account email to use for Google Cloud Batch compute instances. '
+        'This is *not* the service account used to launch the job, but the service account '
+        'used to actually run the job on the Batch VM instances. '
+        'Ensure that this service account has the `roles/batch.agentReporter` role, '
+        'so that VM instances can report their status to Batch.',
     )
     group_gc_all.add_argument(
         '--gcp-zones',
