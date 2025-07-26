@@ -113,9 +113,10 @@ def test_run_gcp_batch_api(
     womtool,
     gcp_prj,
     gcp_service_account_key_json,
+    gcp_compute_service_account,
     debug_caper,
 ):
-    """Test run with Google Cloud Life Sciences API"""
+    """Test run with Google Cloud Batch API"""
     out_gcs_bucket = os.path.join(gcs_root, 'caper_out', ci_prefix)
     tmp_gcs_bucket = os.path.join(gcs_root, 'caper_tmp')
 
@@ -130,6 +131,8 @@ def test_run_gcp_batch_api(
     cmd += ['-m', str(metadata)]
     if gcp_service_account_key_json:
         cmd += ['--gcp-service-account-key-json', gcp_service_account_key_json]
+    if gcp_compute_service_account:
+        cmd += ['--gcp-compute-service-account', gcp_compute_service_account]
     cmd += ['--gcp-region', 'us-central1']
     # --gcp-zones should be ignored
     cmd += ['--gcp-zones', 'us-west1-a,us-west1-b']

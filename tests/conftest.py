@@ -34,6 +34,9 @@ def pytest_addoption(parser):
         '--gcp-service-account-key-json', help='JSON key file for GCP service account.'
     )
     parser.addoption(
+        '--gcp-compute-service-account', help='Service account for Google Compute Engine.'
+    )
+    parser.addoption(
         '--debug-caper', action='store_true', help='Debug-level logging for CLI tests.'
     )
 
@@ -67,6 +70,12 @@ def gcp_prj(request):
 @pytest.fixture(scope='session')
 def gcp_service_account_key_json(request):
     return request.config.getoption('--gcp-service-account-key-json')
+
+@pytest.fixture(scope='session')
+def gcp_compute_service_account(request):
+    return request.config.getoption(
+        '--gcp-compute-service-account'
+    )
 
 
 @pytest.fixture(scope='session')
