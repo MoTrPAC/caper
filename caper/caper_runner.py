@@ -68,6 +68,7 @@ class CaperRunner(CaperBase):
         gcp_out_dir=None,
         gcp_call_caching_dup_strat=CromwellBackendGcp.DEFAULT_CALL_CACHING_DUP_STRAT,
         gcp_service_account_key_json=None,
+        gcp_compute_service_account=None,
         gcp_region=CromwellBackendGcp.DEFAULT_REGION,
         aws_batch_arn=None,
         aws_region=None,
@@ -123,6 +124,11 @@ class CaperRunner(CaperBase):
                 This will be added to environment variable
                 GOOGLE_APPLICATION_CREDENTIALS
                 If not match with existing key then error out.
+            gcp_compute_service_account:
+                Service account email to use for Google Cloud Batch compute instances.
+                If not provided, the default Compute Engine service account will be used.
+                Ensure that this service account has the `roles/batch.agentReporter` role, so that 
+                VM instances can report their status to Batch.
             gcp_region:
                 Region for Google Cloud Batch API.
             gcp_out_dir:
@@ -201,6 +207,7 @@ class CaperRunner(CaperBase):
             memory_retry_error_keys=memory_retry_error_keys,
             gcp_call_caching_dup_strat=gcp_call_caching_dup_strat,
             gcp_service_account_key_json=gcp_service_account_key_json,
+            gcp_compute_service_account=gcp_compute_service_account,
             gcp_region=gcp_region,
             aws_batch_arn=aws_batch_arn,
             aws_region=aws_region,
