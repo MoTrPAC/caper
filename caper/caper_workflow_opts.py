@@ -31,6 +31,7 @@ class CaperWorkflowOpts:
     def __init__(
         self,
         gcp_zones=None,
+        gcp_compute_service_account=None,
         slurm_partition=None,
         slurm_account=None,
         slurm_extra_param=None,
@@ -45,10 +46,15 @@ class CaperWorkflowOpts:
         """Template for a workflows options JSON file.
         All parameters are optional.
 
+        If parameters have been set at the backend-level, these workflow-level options will 
+        override them.
+
         Args:
             gcp_zones:
                 For gcp backend only.
                 List of GCP zones to run workflows on.
+            gcp_compute_service_account:
+                Overrides the service account for Batch VM instances.
             slurm_partition:
                 For slurm backend only.
                 SLURM partition to submit tasks to.
@@ -94,6 +100,8 @@ class CaperWorkflowOpts:
 
         if gcp_zones:
             default_runtime_attributes['zones'] = ' '.join(gcp_zones)
+        if gcp_compute_service_account:
+            default_runtime_attributes['google_compute_service_account'] = gcp_compute_service_account
 
         if slurm_partition:
             default_runtime_attributes['slurm_partition'] = slurm_partition

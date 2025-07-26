@@ -56,6 +56,7 @@ class CaperBackendConf:
         gcp_out_dir=None,
         gcp_call_caching_dup_strat=CromwellBackendGcp.DEFAULT_CALL_CACHING_DUP_STRAT,
         gcp_service_account_key_json=None,
+        gcp_compute_service_account=None,
         gcp_region=CromwellBackendGcp.DEFAULT_REGION,
         aws_batch_arn=None,
         aws_region=None,
@@ -140,8 +141,11 @@ class CaperBackendConf:
                 Call-caching duplication strategy for GCP backend.
             gcp_service_account_key_json:
                 GCP service account key JSON.
-                If defined, service_account scheme will be used instead of application_default
-                in Cromwell.
+            gcp_compute_service_account:
+                The email of the GCP service account email to use for the Batch compute instances.
+                If not provided, the default Compute Engine service account will be used.
+                Ensure that this service account has the `roles/batch.agentReporter` role, so that 
+                VM instances can report their status to Batch.
             gcp_region:
                 Region for Google Cloud Batch API.
             aws_batch_arn:
@@ -288,6 +292,7 @@ class CaperBackendConf:
                     gcp_out_dir=gcp_out_dir,
                     call_caching_dup_strat=gcp_call_caching_dup_strat,
                     gcp_service_account_key_json=gcp_service_account_key_json,
+                    gcp_compute_service_account=gcp_compute_service_account,
                     gcp_region=gcp_region,
                 ),
             )

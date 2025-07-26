@@ -312,6 +312,7 @@ class CromwellBackendGcp(CromwellBackendBase):
         gcp_prj,
         gcp_out_dir,
         gcp_service_account_key_json=None,
+        gcp_compute_service_account=None,
         gcp_region=DEFAULT_REGION,
         max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
         call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
@@ -321,6 +322,11 @@ class CromwellBackendGcp(CromwellBackendBase):
             gcp_service_account_key_json:
                 Use this key JSON file to use service_account scheme
                 instead of application_default.
+            gcp_compute_service_account:
+                Set this to override the Batch compute service account. Otherwise,
+                defaults to the project's compute engine service account. Ensure that 
+                this service account has the `roles/batch.agentReporter` role, so that 
+                VM instances can report their status to Batch.
             gcp_region:
                 Region for Google Cloud Batch API.
         """
@@ -357,10 +363,6 @@ class CromwellBackendGcp(CromwellBackendBase):
                     'json-file': gcp_service_account_key_json,
                 }
             ]
-            # parse service account key JSON to get client_email.
-            with open(gcp_service_account_key_json) as fp:
-                key_json = json.loads(fp.read())
-            batch['compute-service-account'] = key_json['client_email']
             self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = 'service-account'
         else:
             batch['auth'] = 'application-default'
@@ -371,6 +373,10 @@ class CromwellBackendGcp(CromwellBackendBase):
             self['engine']['filesystems'][FILESYSTEM_GCS][
                 'auth'
             ] = 'application-default'
+
+        # If service account email is provided, use it for compute-service-account
+        if gcp_compute_service_account:
+            batch['compute-service-account'] = gcp_compute_service_account
 
         self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
 
