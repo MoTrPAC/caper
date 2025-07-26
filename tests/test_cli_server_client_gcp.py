@@ -27,6 +27,7 @@ def test_server_client(
     womtool,
     gcp_prj,
     gcp_service_account_key_json,
+    gcp_compute_service_account,
     debug_caper,
 ):
     """Test server, client stuffs"""
@@ -41,6 +42,8 @@ def test_server_client(
     cmd += ['--backend', 'gcp']
     if gcp_service_account_key_json:
         cmd += ['--gcp-service-account-key-json', gcp_service_account_key_json]
+    if gcp_compute_service_account:
+        cmd += ['--gcp-compute-service-account', gcp_compute_service_account]
     cmd += ['--gcp-prj', gcp_prj]
     cmd += ['--gcp-zones', 'us-west1-a,us-west1-b']
     cmd += ['--gcp-out-dir', out_gcs_bucket]

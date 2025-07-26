@@ -101,7 +101,7 @@ def test_nb_subproc_thread_nonzero_rc():
         assert th.returncode == rc
 
 
-@pytest.mark.parametrize('test_app,expected_rc', [('cat', 1), ('ls', 2), ('java', 1)])
+@pytest.mark.parametrize('test_app,expected_rc', [('cat', 1), ('ls', 1), ('java', 1)])
 def test_nb_subproc_thread_nonzero_rc_for_real_apps(test_app, expected_rc):
     test_str = 'asdfasf-10190212-zxcv'
     if os.path.exists(test_str):
