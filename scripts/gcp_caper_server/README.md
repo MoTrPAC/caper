@@ -2,6 +2,8 @@
 
 `create_instance.sh` will create an instance on Google Cloud Compute Engine in Google your project and configure the instance for Caper with PostgreSQL database and Google Cloud Batch API.
 
+> **NOTE**: Google Cloud Genomics API and Cloud Life Sciences API have been deprecated and removed. Caper now uses Google Cloud Batch API exclusively.
+
 ## Install Google Cloud SDK SLI
 
 Make sure that `gcloud` (Google Cloud SDK CLI) is installed on your system.
@@ -21,6 +23,8 @@ Go to [Service accounts](https://console.cloud.google.com/iam-admin/serviceaccou
 Generate a secret key JSON from the service account and keep it locally on your computer.
 
 > **WARNING**: Such secret JSON file is a master key for important resources on your project. Keep it secure at your own risk. This file will be used for Caper so that it will be trasnferred to the created instance at `/opt/caper/service_account_key.json` visible to all users on the instance.
+
+> **IMPORTANT**: The service account specified above is used to launch Batch jobs. This is different from the Compute Service Account used by the Google Cloud Batch VMs to run the actual tasks. You can specify a different Compute Service Account using the `--gcp-compute-service-account` parameter. The Compute Service Account needs the `roles/batch.agentReporter` role to report status back to Batch.
 
 ## How to create an instance
 
