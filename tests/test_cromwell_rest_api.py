@@ -48,6 +48,7 @@ def test_has_wildcard(test_input, expected):
     assert has_wildcard(test_input) == expected
 
 
+@pytest.mark.slow
 def test_all(tmp_path, cromwell, womtool):
     """Test Cromwell.server() method, which returns a Thread object."""
     server_port = 8010
