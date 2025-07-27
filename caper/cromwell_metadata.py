@@ -1,46 +1,55 @@
+from __future__ import annotations
+
 import io
 import json
 import logging
 import os
 import re
 from collections import defaultdict
+from typing import Any, Callable
 
 import humanfriendly
 import numpy as np
 import pandas as pd
 from autouri import GCSURI, AbsPath, AutoURI, URIBase
+from pathlib import Path
 
 from .dict_tool import recurse_dict_value
 
 logger = logging.getLogger(__name__)
 
 
-def get_workflow_root_from_call(call):
+def get_workflow_root_from_call(call: dict[str, Any]) -> str | None:
     call_root = call.get('callRoot')
     if call_root:
         return '/'.join(call_root.split('/')[:-1])
+    return None
 
 
-def get_workflow_id_from_workflow_root(workflow_root):
+def get_workflow_id_from_workflow_root(workflow_root: str | None) -> str | None:
     if workflow_root:
         return workflow_root.split('/')[-1]
+    return None
 
 
-def parse_cromwell_disks(s):
+def parse_cromwell_disks(s: str | None) -> int:
     """Parses Cromwell's disks in runtime attribute."""
     if s:
         m = re.findall(r'(\d+)', s)
         if m:
             return int(m[0]) * 1024 * 1024 * 1024
+        return None
+    return None
 
 
-def parse_cromwell_memory(s):
+def parse_cromwell_memory(s: str | None) -> int:
     """Parses Cromwell's memory runtime attribute."""
     if s:
         return humanfriendly.parse_size(s)
+    return None
 
 
-def convert_type_np_to_py(o):
+def convert_type_np_to_py(o: Any) -> Any:
     """Convert numpy type to Python type."""
     if isinstance(o, np.generic):
         return o.item()
@@ -51,7 +60,7 @@ class CromwellMetadata:
     DEFAULT_METADATA_BASENAME = 'metadata.json'
     DEFAULT_GCP_MONITOR_STAT_METHODS = ('mean', 'std', 'max', 'min', 'last')
 
-    def __init__(self, metadata):
+    def __init__(self, metadata: dict[str, Any] | str | CromwellMetadata) -> None:
         """Parses metadata JSON (dict) object or file."""
         if isinstance(metadata, dict):
             self._metadata = metadata
@@ -62,49 +71,50 @@ class CromwellMetadata:
             self._metadata = json.loads(s)
 
     @property
-    def data(self):
+    def data(self) -> dict[str, Any]:
         return self._metadata
 
     @property
-    def metadata(self):
+    def metadata(self) -> dict[str, Any]:
         return self._metadata
 
     @property
-    def workflow_id(self):
+    def workflow_id(self) -> str | None:
         return self._metadata.get('id')
 
     @property
-    def workflow_status(self):
+    def workflow_status(self) -> str | None:
         return self._metadata.get('status')
 
     @property
-    def workflow_root(self):
+    def workflow_root(self) -> str | None:
         if 'workflowRoot' in self._metadata:
             return self._metadata['workflowRoot']
-        else:
-            workflow_roots = [
-                get_workflow_root_from_call(call) for _, call, _ in self.recursed_calls
-            ]
-            common_root = os.path.commonprefix(workflow_roots)
-            if common_root:
-                guessed_workflow_id = get_workflow_id_from_workflow_root(common_root)
-                if guessed_workflow_id == self.workflow_id:
-                    return common_root
-                logger.error(
-                    'workflowRoot not found in metadata JSON. '
-                    'Tried to guess from callRoot of each call but failed.'
-                )
+        workflow_roots = [
+            get_workflow_root_from_call(call) for _, call, _ in self.recursed_calls
+        ]
+        common_root = os.path.commonprefix(workflow_roots)
+        if common_root:
+            guessed_workflow_id = get_workflow_id_from_workflow_root(common_root)
+            if guessed_workflow_id == self.workflow_id:
+                return common_root
+            logger.error(
+                'workflowRoot not found in metadata JSON. '
+                'Tried to guess from callRoot of each call but failed.',
+            )
+            return None
+        return None
 
     @property
-    def failures(self):
+    def failures(self) -> list[dict[str, Any]] | None:
         return self._metadata.get('failures')
 
     @property
-    def calls(self):
+    def calls(self) -> dict[str, Any] | None:
         return self._metadata.get('calls')
 
     @property
-    def recursed_calls(self):
+    def recursed_calls(self) -> list[tuple[str, dict[str, Any], tuple[str, ...]]]:
         """Returns a generator for tuples.
 
         Tuple:
@@ -120,10 +130,10 @@ class CromwellMetadata:
                 call_name,
                 call,
                 parent_call_names,
-            )
+            ),
         )
 
-    def recurse_calls(self, fn_call, parent_call_names=tuple()):
+    def recurse_calls(self, fn_call: Callable[[str, dict[str, Any], tuple[str, ...]], Any], parent_call_names: tuple[str, ...] = ()) -> list[Any]:
         """Recurse on tasks in metadata.
 
         Args:
@@ -149,24 +159,26 @@ class CromwellMetadata:
                     subworkflow = call['subWorkflowMetadata']
                     subworkflow_metadata = CromwellMetadata(subworkflow)
                     yield from subworkflow_metadata.recurse_calls(
-                        fn_call, parent_call_names=parent_call_names + (call_name,)
+                        fn_call,
+                        parent_call_names=(*parent_call_names, call_name),
                     )
                 else:
                     yield fn_call(call_name, call, parent_call_names)
 
-    def write_on_workflow_root(self, basename=DEFAULT_METADATA_BASENAME):
+    def write_on_workflow_root(self, basename: str = DEFAULT_METADATA_BASENAME) -> str | None:
         """Update metadata JSON file on metadata's output root directory."""
         root = self.workflow_root
 
         if root:
-            metadata_file = os.path.join(root, basename)
+            metadata_file = str(Path(root) / basename)
 
             AutoURI(metadata_file).write(json.dumps(self._metadata, indent=4) + '\n')
-            logger.info('Wrote metadata file. {f}'.format(f=metadata_file))
+            logger.info('Wrote metadata file. %s', metadata_file)
 
             return metadata_file
+        return None
 
-    def troubleshoot(self, show_completed_task=False, show_stdout=False):
+    def troubleshoot(self, show_completed_task: bool = False, show_stdout: bool = False) -> str:
         """Troubleshoots a workflow.
         Also, finds failure reasons and prints out STDERR and STDOUT.
 
@@ -179,22 +191,16 @@ class CromwellMetadata:
             result:
                 Troubleshooting report as a plain string.
         """
-        result = (
-            '* Started troubleshooting workflow: id={id}, status={status}\n'.format(
-                id=self.workflow_id, status=self.workflow_status
-            )
-        )
+        result = f'* Started troubleshooting workflow: id={self.workflow_id}, status={self.workflow_status}\n'
 
         if self.workflow_status == 'Succeeded':
             result += '* Workflow ran Successfully.\n'
 
         else:
             if self.failures:
-                result += '* Found failures JSON object.\n{s}\n'.format(
-                    s=json.dumps(self.failures, indent=4)
-                )
+                result += f'* Found failures JSON object.\n{json.dumps(self.failures, indent=4)}\n'
 
-            def troubleshoot_call(call_name, call, parent_call_names):
+            def troubleshoot_call(call_name: str, call: dict[str, Any], parent_call_names: tuple[str, ...]) -> str:
                 """Returns troubleshooting help message."""
                 nonlocal show_completed_task
                 nonlocal show_stdout
@@ -232,21 +238,12 @@ class CromwellMetadata:
                             stderr=stderr,
                         )
                     )
-                    if stderr:
-                        if AutoURI(stderr).exists:
-                            help_msg += 'STDERR_CONTENTS=\n{s}\n'.format(
-                                s=AutoURI(stderr).read()
-                            )
-                    if show_stdout and stdout:
-                        if AutoURI(stdout).exists:
-                            help_msg += 'STDOUT_CONTENTS=\n{s}\n'.format(
-                                s=AutoURI(stdout).read()
-                            )
-                    if strerr_background:
-                        if AutoURI(strerr_background).exists:
-                            help_msg += 'STDERR_BACKGROUND_CONTENTS=\n{s}\n'.format(
-                                s=AutoURI(strerr_background).read()
-                            )
+                    if stderr and AutoURI(stderr).exists:
+                        help_msg += f'STDERR_CONTENTS=\n{AutoURI(stderr).read()}\n'
+                    if show_stdout and stdout and AutoURI(stdout).exists:
+                        help_msg += f'STDOUT_CONTENTS=\n{AutoURI(stdout).read()}\n'
+                    if strerr_background and AutoURI(strerr_background).exists:
+                        help_msg += f'STDERR_BACKGROUND_CONTENTS=\n{AutoURI(strerr_background).read()}\n'
 
                 return help_msg
 
@@ -258,10 +255,10 @@ class CromwellMetadata:
 
     def gcp_monitor(
         self,
-        task_name=None,
-        excluded_cols=(0,),
-        stat_methods=DEFAULT_GCP_MONITOR_STAT_METHODS,
-    ):
+        task_name: str | None = None,
+        excluded_cols: tuple[int, ...] = (0,),
+        stat_methods: list[str] = DEFAULT_GCP_MONITOR_STAT_METHODS,
+    ) -> dict[str, Any]:
         """Recursively parse task(call)'s `monitoringLog`
         (`monitoring.log` in task's execution directory)
         generated by `monitoring_script` defined in workflow options.
@@ -354,7 +351,7 @@ class CromwellMetadata:
         file_size_cache = {}
         workflow_id = self.workflow_id
 
-        def gcp_monitor_call(call_name, call, parent_call_names):
+        def gcp_monitor_call(call_name: str, call: dict[str, Any], _parent_call_names: list[str]) -> dict[str, Any]:
             nonlocal excluded_cols
             nonlocal stat_methods
             nonlocal file_size_cache
@@ -362,21 +359,22 @@ class CromwellMetadata:
             nonlocal task_name
 
             if task_name and task_name != call_name:
-                return
+                return None
 
             monitoring_log = call.get('monitoringLog')
             if monitoring_log is None:
-                return
+                return None
             if not GCSURI(monitoring_log).is_valid:
                 # This feature is for GCSURI only.
-                return
+                return None
             if not GCSURI(monitoring_log).exists:
                 # Workaround for Cromwell-52's bug.
                 # Call-cached task has `monitoringLog`, but it does not exist.
-                return
+                return None
 
             dataframe = pd.read_csv(
-                io.StringIO(GCSURI(monitoring_log).read()), delimiter='\t'
+                io.StringIO(GCSURI(monitoring_log).read()),
+                delimiter='\t',
             )
             rt_attrs = call.get('runtimeAttributes')
 
@@ -410,19 +408,17 @@ class CromwellMetadata:
             for input_name, input_value in sorted(call['inputs'].items()):
                 file_sizes_dict = data['input_file_sizes']
 
-                def add_to_input_files_if_valid(file):
+                def add_to_input_files_if_valid(file_path: str, current_input_name: str, current_file_sizes_dict: dict[str, list[int]]) -> None:
                     nonlocal file_size_cache
-                    nonlocal file_sizes_dict
-                    nonlocal input_name
 
-                    if GCSURI(file).is_valid:
-                        file_size = file_size_cache.get(file)
+                    if GCSURI(file_path).is_valid:
+                        file_size = file_size_cache.get(file_path)
                         if file_size is None:
-                            file_size = GCSURI(file).size
-                            file_size_cache[file] = file_size
-                        file_sizes_dict[input_name].append(file_size)
+                            file_size = GCSURI(file_path).size
+                            file_size_cache[file_path] = file_size
+                        current_file_sizes_dict[current_input_name].append(file_size)
 
-                recurse_dict_value(input_value, add_to_input_files_if_valid)
+                recurse_dict_value(input_value, lambda f: add_to_input_files_if_valid(f, input_name, file_sizes_dict))
 
             return data
 
@@ -432,9 +428,39 @@ class CromwellMetadata:
         json_str = json.dumps(result, default=convert_type_np_to_py)
         return json.loads(json_str)
 
+    def get_task_input_files(self, file: str) -> list[str]:
+        """Recursively finds all input files for a given file path.
+
+        Args:
+            file:
+                The path to the file to find input files for.
+        Returns:
+            A list of input file paths.
+        """
+        input_files = []
+
+        def find_input_files(_call_name: str, call: dict[str, Any], _parent_call_names: list[str]) -> None:
+            nonlocal input_files
+            nonlocal file
+
+            if 'subWorkflowMetadata' in call:
+                subworkflow = call['subWorkflowMetadata']
+                subworkflow_metadata = CromwellMetadata(subworkflow)
+                subworkflow_metadata.get_task_input_files(file)
+            else:
+                # This is a task call, check if the file is an input file
+                if file in call.get('inputs', {}):
+                    input_files.append(file)
+
+        self.recurse_calls(find_input_files)
+        return input_files
+
     def cleanup(
-        self, dry_run=False, num_threads=URIBase.DEFAULT_NUM_THREADS, no_lock=False
-    ):
+        self,
+        dry_run: bool = False,
+        num_threads: int = URIBase.DEFAULT_NUM_THREADS,
+        no_lock: bool = False,
+    ) -> None:
         """Cleans up workflow's root output directory.
 
         Args:
@@ -450,8 +476,8 @@ class CromwellMetadata:
         root = self.workflow_root
         if not root:
             logger.error(
-                'workflow\'s root directory cannot be found in metadata JSON. '
-                'Cannot proceed to cleanup outputs.'
+                "workflow's root directory cannot be found in metadata JSON. "
+                'Cannot proceed to cleanup outputs.',
             )
             return
 
@@ -460,5 +486,7 @@ class CromwellMetadata:
             AbsPath(root).rmdir(dry_run=dry_run, no_lock=no_lock)
         else:
             AutoURI(root).rmdir(
-                dry_run=dry_run, no_lock=no_lock, num_threads=num_threads
+                dry_run=dry_run,
+                no_lock=no_lock,
+                num_threads=num_threads,
             )

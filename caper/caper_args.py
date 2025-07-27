@@ -1,3 +1,10 @@
+from __future__ import annotations
+from argparse import ArgumentParser
+
+
+from typing import Any
+
+
 import argparse
 import os
 from enum import Enum
@@ -54,7 +61,9 @@ def get_defaults(conf_file=None):
     return conf_dict
 
 
-def get_parser_and_defaults(conf_file=None):
+def get_parser_and_defaults(
+    conf_file=None,
+) -> tuple[ArgumentParser, dict[str, Any] | None]:
     """Creates a main parser and make a subparser for each subcommand.
     There are many parent parsers defined here.
     Each subparser will take a certain combination of these parent parsers
@@ -79,7 +88,7 @@ def get_parser_and_defaults(conf_file=None):
             defaults of arguments defined in ArgumentParser object.
     """
     parser = argparse.ArgumentParser(
-        description='Caper (Cromwell-assisted Pipeline ExecutioneR)'
+        description='Caper (Cromwell-assisted Pipeline ExecutioneR)',
     )
     parser.add_argument('-v', '--version', action='store_true', help='Show version')
 
@@ -91,29 +100,35 @@ def get_parser_and_defaults(conf_file=None):
     # all
     parent_all = argparse.ArgumentParser(add_help=False)
     parent_all.add_argument(
-        '-c', '--conf', help='Specify config file', default=DEFAULT_CAPER_CONF
+        '-c',
+        '--conf',
+        help='Specify config file',
+        default=DEFAULT_CAPER_CONF,
     )
     parent_all.add_argument(
-        '-D', '--debug', action='store_true', help='Prints all logs >= DEBUG level'
+        '-D',
+        '--debug',
+        action='store_true',
+        help='Prints all logs >= DEBUG level',
     )
     parent_all.add_argument(
         '--gcp-service-account-key-json',
         help='Secret key JSON file for Google Cloud Platform service account. '
         'This service account should have enough permission to Storage for client '
-        'functions and Storage/Compute Engine/Batch API for server/runner functions. ' 
+        'functions and Storage/Compute Engine/Batch API for server/runner functions. '
         'We recommend using application default credentials for authentication.',
     )
 
     group_loc = parent_all.add_argument_group(
-        title='cache directories for localization'
+        title='cache directories for localization',
     )
     group_loc.add_argument(
         '--local-loc-dir',
         '--tmp-dir',
-        help='Temporary directory to store Cromwell\'s intermediate backend files. '
+        help="Temporary directory to store Cromwell's intermediate backend files. "
         'These files include backend.conf, workflow_opts.json, imports.zip. and '
         'localized input JSON files due to deepcopying (recursive localization). '
-        'Cromwell\'s MySQL/PostgreSQL DB password can be exposed on backend.conf '
+        "Cromwell's MySQL/PostgreSQL DB password can be exposed on backend.conf "
         'on this directory. Therefore, DO NOT USE /tmp HERE. This directory is '
         'also used for storing cached files for local/slurm/sge/pbs/lsf backends.',
     )
@@ -148,12 +163,12 @@ def get_parser_and_defaults(conf_file=None):
         '--cromwell-stdout',
         default=DEFAULT_CROMWELL_STDOUT,
         help='Local file to write STDOUT of Cromwell Java process to. '
-        'This is for Cromwell (not for Caper\'s logging system). '
+        "This is for Cromwell (not for Caper's logging system). "
         'If this file already exists then Caper will make a new file suffixed with '
         'incremented index. e.g. cromwell.out.1 ',
     )
     group_db = parent_runner.add_argument_group(
-        title='General DB settings (for both file DB and MySQL DB)'
+        title='General DB settings (for both file DB and MySQL DB)',
     )
     group_db.add_argument(
         '--db',
@@ -168,12 +183,12 @@ def get_parser_and_defaults(conf_file=None):
     )
 
     group_file_db = parent_runner.add_argument_group(
-        title='HyperSQL file DB arguments (unstable, not recommended)'
+        title='HyperSQL file DB arguments (unstable, not recommended)',
     )
     group_file_db.add_argument(
         '--file-db',
         '-d',
-        help='Default DB file for Cromwell\'s built-in HyperSQL database.',
+        help="Default DB file for Cromwell's built-in HyperSQL database.",
     )
 
     group_mysql = parent_runner.add_argument_group(title='MySQL DB arguments')
@@ -266,7 +281,7 @@ def get_parser_and_defaults(conf_file=None):
     group_cromwell.add_argument(
         '--disable-call-caching',
         action='store_true',
-        help='Disable Cromwell\'s call caching, which re-uses outputs from '
+        help="Disable Cromwell's call caching, which re-uses outputs from "
         'previous workflows',
     )
     group_cromwell.add_argument(
@@ -310,17 +325,17 @@ def get_parser_and_defaults(conf_file=None):
     group_local.add_argument(
         '--slurm-resource-param',
         help='SLURM resource parameters to be passed to sbatch. '
-        'You can customize this to fit your cluster\'s configuration. '
-        'You can use WDL syntax in ${} notation with Cromwell\'s built-in resource '
+        "You can customize this to fit your cluster's configuration. "
+        "You can use WDL syntax in ${} notation with Cromwell's built-in resource "
         'variables. See documentation for details. ',
         default=CromwellBackendSlurm.DEFAULT_SLURM_RESOURCE_PARAM,
     )
 
     group_gc_all = parent_backend.add_argument_group(
-        title='GCP backend arguments for server/runner/client'
+        title='GCP backend arguments for server/runner/client',
     )
     group_gc = parent_runner.add_argument_group(
-        title='GCP backend arguments for server/runner'
+        title='GCP backend arguments for server/runner',
     )
     group_gc.add_argument('--gcp-prj', help='Google Cloud project')
     group_gc.add_argument(
@@ -339,7 +354,7 @@ def get_parser_and_defaults(conf_file=None):
     group_gc_all.add_argument(
         '--gcp-zones',
         help='Comma-separated GCP zones used for Running jobs in Batch. '
-        '(e.g. us-west1-b,us-central1-b). '
+        '(e.g. us-west1-b,us-central1-b). ',
     )
     group_gc.add_argument(
         '--gcp-call-caching-dup-strat',
@@ -351,7 +366,7 @@ def get_parser_and_defaults(conf_file=None):
     group_gc.add_argument(
         '--gcp-out-dir',
         '--out-gcs-bucket',
-        help='Output directory path for GCP backend. ' 'e.g. gs://my-bucket/my-output.',
+        help='Output directory path for GCP backend. e.g. gs://my-bucket/my-output.',
     )
 
     group_aws = parent_runner.add_argument_group(title='AWS backend arguments')
@@ -360,8 +375,7 @@ def get_parser_and_defaults(conf_file=None):
     group_aws.add_argument(
         '--aws-out-dir',
         '--out-s3-bucket',
-        help='Output path on S3 bucket for AWS backend. '
-        'e.g. s3://my-bucket/my-output.',
+        help='Output path on S3 bucket for AWS backend. e.g. s3://my-bucket/my-output.',
     )
     group_aws.add_argument(
         '--aws-call-caching-dup-strat',
@@ -384,18 +398,20 @@ def get_parser_and_defaults(conf_file=None):
     parent_submit.add_argument('-o', '--options', help='Workflow options JSON file')
     parent_submit.add_argument('-l', '--labels', help='Workflow labels JSON file')
     parent_submit.add_argument(
-        '-p', '--imports', help='Zip file of imported subworkflows'
+        '-p',
+        '--imports',
+        help='Zip file of imported subworkflows',
     )
     parent_submit.add_argument(
         '-s',
         '--str-label',
-        help='Caper\'s special label for a workflow '
+        help="Caper's special label for a workflow "
         'This label will be added to a workflow labels JSON file '
         'as a value for a key "caper-label". '
         'DO NOT USE IRREGULAR CHARACTERS. USE LETTERS, NUMBERS, '
         'DASHES AND UNDERSCORES ONLY (^[A-Za-z0-9\\-\\_]+$) '
         'since this label is used to compose a path for '
-        'workflow\'s temporary/cache directory (.caper_tmp/label/timestamp/)',
+        "workflow's temporary/cache directory (.caper_tmp/label/timestamp/)",
     )
     parent_submit.add_argument(
         '--hold',
@@ -431,7 +447,7 @@ def get_parser_and_defaults(conf_file=None):
     parent_submit.add_argument(
         '--womtool',
         default=Cromwell.DEFAULT_WOMTOOL,
-        help='Path or URL for Cromwell\'s womtool JAR file',
+        help="Path or URL for Cromwell's womtool JAR file",
     )
     parent_submit.add_argument(
         '--java-heap-womtool',
@@ -511,7 +527,7 @@ def get_parser_and_defaults(conf_file=None):
         nargs='?',
         const='',
         default=None,
-        help='Default Conda environment\'s name. '
+        help="Default Conda environment's name. "
         'If defined each task in WDL will be called with conda run -n ENV_NAME.'
         'This can also be used as a flag to use Conda environment '
         'defined in your WDL file under "workflow.meta.default_conda".',
@@ -554,28 +570,33 @@ def get_parser_and_defaults(conf_file=None):
     group_slurm.add_argument('--slurm-partition', help='SLURM partition')
     group_slurm.add_argument('--slurm-account', help='SLURM account')
     group_slurm.add_argument(
-        '--slurm-extra-param', help='SLURM extra parameters to be passed to sbatch. '
+        '--slurm-extra-param',
+        help='SLURM extra parameters to be passed to sbatch. ',
     )
 
     group_sge = parent_submit.add_argument_group('SGE arguments')
     group_sge.add_argument(
-        '--sge-pe', help='SGE parallel environment. Check with "qconf -spl"'
+        '--sge-pe',
+        help='SGE parallel environment. Check with "qconf -spl"',
     )
     group_sge.add_argument('--sge-queue', help='SGE queue. Check with "qconf -sql"')
     group_sge.add_argument(
-        '--sge-extra-param', help='SGE extra parameters. Must be double-quoted'
+        '--sge-extra-param',
+        help='SGE extra parameters. Must be double-quoted',
     )
 
     group_pbs = parent_submit.add_argument_group('PBS arguments')
     group_pbs.add_argument('--pbs-queue', help='PBS queue')
     group_pbs.add_argument(
-        '--pbs-extra-param', help='PBS extra parameters. Must be double-quoted'
+        '--pbs-extra-param',
+        help='PBS extra parameters. Must be double-quoted',
     )
 
     group_lsf = parent_submit.add_argument_group('LSF arguments')
     group_lsf.add_argument('--lsf-queue', help='LSF queue')
     group_lsf.add_argument(
-        '--lsf-extra-param', help='LSF extra parameters. Must be double-quoted'
+        '--lsf-extra-param',
+        help='LSF extra parameters. Must be double-quoted',
     )
 
     # server
@@ -657,7 +678,7 @@ def get_parser_and_defaults(conf_file=None):
         default=DEFAULT_LIST_FORMAT,
         help='Comma-separated list of items to be shown for "list" '
         'subcommand. Any key name in workflow JSON from Cromwell '
-        'server\'s response is allowed. '
+        "server's response is allowed. "
         'Available keys are "id" (workflow ID), "status", "str_label", '
         '"name" (WDL/CWL name), "submission" (date/time), "start", '
         '"end" and "user". '
@@ -687,7 +708,9 @@ def get_parser_and_defaults(conf_file=None):
         help='Show information about completed tasks.',
     )
     parent_troubleshoot.add_argument(
-        '--show-stdout', action='store_true', help='Show STDOUT for failed tasks.'
+        '--show-stdout',
+        action='store_true',
+        help='Show STDOUT for failed tasks.',
     )
 
     # gcp_monitor
@@ -751,7 +774,7 @@ def get_parser_and_defaults(conf_file=None):
         '--num-threads',
         default=URIBase.DEFAULT_NUM_THREADS,
         type=int,
-        help='Number of threads for cleaning up workflow\'s outputs. '
+        help="Number of threads for cleaning up workflow's outputs. "
         'This is used for cloud backends only.',
     )
 
@@ -766,7 +789,7 @@ def get_parser_and_defaults(conf_file=None):
     # all subcommands
     p_init = subparser.add_parser(
         'init',
-        help='Initialize Caper\'s configuration file. THIS WILL OVERWRITE ON '
+        help="Initialize Caper's configuration file. THIS WILL OVERWRITE ON "
         'A SPECIFIED(-c)/DEFAULT CONF FILE. e.g. ~/.caper/default.conf.',
         parents=[parent_all, parent_init],
     )
@@ -825,8 +848,7 @@ def get_parser_and_defaults(conf_file=None):
     )
     p_troubleshoot = subparser.add_parser(
         'troubleshoot',
-        help='Troubleshoot workflow problems from metadata JSON file or '
-        'workflow IDs',
+        help='Troubleshoot workflow problems from metadata JSON file or workflow IDs',
         parents=[
             parent_all,
             parent_server_client,
@@ -872,7 +894,7 @@ def get_parser_and_defaults(conf_file=None):
 
     p_gcp_monitor = subparser.add_parser(
         'gcp_monitor',
-        help='Tabulate task\'s resource data collected on '
+        help="Tabulate task's resource data collected on "
         'instances run on Google Cloud Compute. '
         'Use this for any workflows run with Caper>=1.2.0 on gcp backend. '
         'This is for gcp backend only.',
@@ -889,7 +911,7 @@ def get_parser_and_defaults(conf_file=None):
         help='Linear resource analysis on monitoring data collected on '
         'instances run on Google Cloud Compute. This is for gcp backend only. '
         'Use this for any workflows run with Caper>=1.2.0 on gcp backend. '
-        'Calculates coefficients/intercept for task\'s required resources '
+        "Calculates coefficients/intercept for task's required resources "
         'based on input file size of a task. '
         'For each task it solves a linear regression problem of y=Xc + i1 + e where '
         'X is a matrix (m by n) of input file sizes and '
@@ -944,7 +966,9 @@ def get_parser_and_defaults(conf_file=None):
     ]
     if os.path.exists(conf_file):
         conf_dict = update_parsers_defaults_with_conf(
-            parsers=subparsers, conf_file=conf_file, conf_key_map=PARAM_KEY_NAME_CHANGE
+            parsers=subparsers,
+            conf_file=conf_file,
+            conf_key_map=PARAM_KEY_NAME_CHANGE,
         )
     else:
         conf_dict = None

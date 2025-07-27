@@ -1,11 +1,15 @@
 import os
 from argparse import ArgumentParser
 from configparser import ConfigParser, MissingSectionHeaderError
+from typing import Any, Optional, Union
 
 
 def read_from_conf(
-    conf_file, conf_section='defaults', conf_key_map=None, no_strip_quote=False
-):
+    conf_file: str,
+    conf_section: str = 'defaults',
+    conf_key_map: Optional[dict[str, str]] = None,
+    no_strip_quote: bool = False,
+) -> dict[str, str]:
     """Read key/value from conf_section of conf_file.
     Hyphens (-) in keys will be replace with underscores (_).
     All keys and values are considered as strings.
@@ -32,7 +36,8 @@ def read_from_conf(
     """
     conf_file = os.path.expanduser(conf_file)
     if not os.path.exists(conf_file):
-        raise FileNotFoundError('conf_file does not exist. f={f}'.format(f=conf_file))
+        msg = f'conf_file does not exist. f={conf_file}'
+        raise FileNotFoundError(msg)
 
     config = ConfigParser()
     with open(conf_file) as fp:
@@ -40,7 +45,7 @@ def read_from_conf(
         try:
             config.read_string(s)
         except MissingSectionHeaderError:
-            section = '[{sect}]\n'.format(sect=conf_section)
+            section = f'[{conf_section}]\n'
             config.read_string(section + s)
 
     d_ = dict(config.items(conf_section))
@@ -58,14 +63,14 @@ def read_from_conf(
 
 
 def update_parsers_defaults_with_conf(
-    parsers,
-    conf_file,
-    conf_section='defaults',
-    conf_key_map=None,
-    no_strip_quote=False,
-    val_type=None,
-    val_default=None,
-):
+    parsers: ArgumentParser | list[ArgumentParser],
+    conf_file: str,
+    conf_section: str = 'defaults',
+    conf_key_map: dict[str, str] | None = None,
+    no_strip_quote: bool = False,
+    val_type: dict[str, type] | None = None,
+    val_default: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Updates argparse.ArgumentParser's defaults with key/value pairs
     defined in conf_file. Also, returns a dict of key/values defined in
     conf_file with correct type for each value.
@@ -146,9 +151,7 @@ def update_parsers_defaults_with_conf(
 
         def strtobool(value: str) -> bool:
             value = value.lower()
-            if value in ('y', 'yes', 'on', '1', 'true', 't'):
-                return True
-            return False
+            return value in ('y', 'yes', 'on', '1', 'true', 't')
 
         if guessed_type:
             if guessed_type is bool and isinstance(v, str):

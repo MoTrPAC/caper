@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import logging
 import re
 import time
+from typing import Callable, Any
 
 from .cromwell_metadata import CromwellMetadata
 from .cromwell_rest_api import CromwellRestAPI
@@ -9,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowStatusTransition:
-    def __init__(self, regex, status_transitions, auto_write_metadata=False):
+    def __init__(self, regex: str, status_transitions: tuple[tuple[str | None, str], ...], auto_write_metadata: bool = False) -> None:
         """
         Args:
             regex:
@@ -29,7 +32,7 @@ class WorkflowStatusTransition:
         self._status_transitions = status_transitions
         self._auto_write_metadata = auto_write_metadata
 
-    def parse(self, line, workflow_status_map):
+    def parse(self, line: str, workflow_status_map: dict[str, str]) -> tuple[str | None, str | None, bool]:
         """
         Args:
             line:
@@ -50,17 +53,14 @@ class WorkflowStatusTransition:
         r = re.findall(self._regex, line)
         if r:
             wf_id = r[0].strip()
-            if wf_id in workflow_status_map:
-                prev_status = workflow_status_map[wf_id]
-            else:
-                prev_status = None
+            prev_status = workflow_status_map.get(wf_id)
             for st1, st2 in self._status_transitions:
                 if st1 is None or st1 == prev_status:
                     if st1 != st2:
                         logger.info(
-                            'Workflow: id={id}, status={status}'.format(
-                                id=wf_id, status=st2
-                            )
+                            'Workflow: id=%s, status=%s',
+                            wf_id,
+                            st2,
                         )
                         return wf_id, st2, self._auto_write_metadata
                     break
@@ -124,14 +124,14 @@ class CromwellWorkflowMonitor:
 
     def __init__(
         self,
-        is_server=False,
-        server_hostname=DEFAULT_SERVER_HOSTNAME,
-        server_port=DEFAULT_SERVER_PORT,
-        embed_subworkflow=False,
-        auto_write_metadata=False,
-        on_status_change=None,
-        on_server_start=None,
-    ):
+        is_server: bool = False,
+        server_hostname: str = DEFAULT_SERVER_HOSTNAME,
+        server_port: int = DEFAULT_SERVER_PORT,
+        embed_subworkflow: bool = False,
+        auto_write_metadata: bool = False,
+        on_status_change: Callable[[dict[str, Any]], None] | None = None,
+        on_server_start: Callable[[], None] | None = None,
+    ) -> None:
         """Parses STDERR from Cromwell to updates workflow/task information.
         Also, write/update metadata.json on each workflow's root directory.
 
@@ -177,7 +177,8 @@ class CromwellWorkflowMonitor:
 
         if self._is_server:
             self._cromwell_rest_api = CromwellRestAPI(
-                hostname=server_hostname, port=server_port
+                hostname=server_hostname,
+                port=server_port,
             )
         else:
             self._cromwell_rest_api = None
@@ -187,14 +188,14 @@ class CromwellWorkflowMonitor:
         self._on_status_change = on_status_change
         self._on_server_start = on_server_start
 
-        self._workflow_status_map = dict()
+        self._workflow_status_map = {}
         self._subworkflows = set()
         self._is_server_started = False
 
-    def is_server_started(self):
+    def is_server_started(self) -> bool:
         return self._is_server_started
 
-    def update(self, stderr):
+    def update(self, stderr: str) -> None:
         """Update workflows by parsing Cromwell's stderr.
 
         Args:
@@ -212,7 +213,7 @@ class CromwellWorkflowMonitor:
         for w in workflows_to_write_metadata:
             self._write_metadata(w)
 
-    def _update_server_start(self, stderr):
+    def _update_server_start(self, stderr: str) -> None:
         if not self._is_server_started:
             for line in stderr.split('\n'):
                 r1 = re.findall(CromwellWorkflowMonitor.RE_CROMWELL_SERVER_START, line)
@@ -223,14 +224,15 @@ class CromwellWorkflowMonitor:
                     logger.info('Cromwell server started. Ready to take submissions.')
                     break
 
-    def _update_workflows(self, stderr):
+    def _update_workflows(self, stderr: str) -> tuple[set[str], set[str]]:
         """Updates workflow status by parsing Cromwell's stderr lines."""
         updated_workflows = set()
         workflows_to_write_metadata = set()
         for line in stderr.split('\n'):
             for st_transitions in CromwellWorkflowMonitor.ALL_STATUS_TRANSITIONS:
                 workflow_id, status, auto_write_metadata = st_transitions.parse(
-                    line, self._workflow_status_map
+                    line,
+                    self._workflow_status_map,
                 )
                 if workflow_id:
                     self._workflow_status_map[workflow_id] = status
@@ -240,16 +242,16 @@ class CromwellWorkflowMonitor:
 
         return updated_workflows, workflows_to_write_metadata
 
-    def _update_subworkflows(self, stderr):
+    def _update_subworkflows(self, stderr: str) -> None:
         for line in stderr.split('\n'):
             r_sub = re.findall(CromwellWorkflowMonitor.RE_SUBWORKFLOW_FOUND, line)
             if r_sub:
                 subworkflow_id = r_sub[0]
                 if subworkflow_id not in self._subworkflows:
-                    logger.info('Subworkflow found: {id}'.format(id=subworkflow_id))
+                    logger.info('Subworkflow found: %s', subworkflow_id)
                 self._subworkflows.add(subworkflow_id)
 
-    def _update_tasks(self, stderr):
+    def _update_tasks(self, stderr: str) -> None:
         """Check if workflow's task status changed by parsing Cromwell's stderr lines."""
         for line in stderr.split('\n'):
             r_common = None
@@ -266,7 +268,8 @@ class CromwellWorkflowMonitor:
                 job_id = None
 
             r_status_change = re.findall(
-                CromwellWorkflowMonitor.RE_TASK_STATUS_CHANGE, line
+                CromwellWorkflowMonitor.RE_TASK_STATUS_CHANGE,
+                line,
             )
             if r_status_change:
                 r_common = r_status_change[0]
@@ -284,31 +287,25 @@ class CromwellWorkflowMonitor:
                     shard_idx = -1
                 retry = int(r_common[3])
 
-                msg = 'Task: id={id}, task={name}:{shard_idx}, retry={retry}, status={status}'.format(
-                    id=workflow_id,
-                    name=task_name,
-                    shard_idx=shard_idx,
-                    retry=retry - 1,
-                    status=status,
-                )
+                msg = f'Task: id={workflow_id}, task={task_name}:{shard_idx}, retry={retry - 1}, status={status}'
                 if job_id:
-                    msg += ', job_id={job_id}'.format(job_id=job_id)
+                    msg += f', job_id={job_id}'
                 logger.info(msg)
 
-    def _find_workflow_id_from_short_id(self, short_id):
+    def _find_workflow_id_from_short_id(self, short_id: str) -> str | None:
         for w in self._subworkflows.union(set(self._workflow_status_map.keys())):
             if w.startswith(short_id):
                 return w
+        return None
 
-    def _write_metadata(self, workflow_id):
+    def _write_metadata(self, workflow_id: str) -> None:
         """Update metadata on Cromwell'e exec root."""
         if not self._is_server or not self._auto_write_metadata:
             return
         if workflow_id in self._subworkflows and self._embed_subworkflow:
             logger.debug(
-                'Skipped writing metadata JSON file of subworkflow {wf_id}'.format(
-                    wf_id=workflow_id
-                )
+                'Skipped writing metadata JSON file of subworkflow %s',
+                workflow_id,
             )
             return
         for trial in range(CromwellWorkflowMonitor.MAX_RETRY_WRITE_METADATA + 1):
@@ -323,9 +320,10 @@ class CromwellWorkflowMonitor:
                 cm = CromwellMetadata(metadata)
                 cm.write_on_workflow_root()
             except Exception:
-                logger.error(
-                    'Failed to retrieve metadata from Cromwell server. '
-                    'trial={t}, id={wf_id}'.format(t=trial, wf_id=workflow_id)
+                logger.exception(
+                    'Failed to retrieve metadata from Cromwell server. trial=%s, id=%s',
+                    trial,
+                    workflow_id,
                 )
                 continue
             break

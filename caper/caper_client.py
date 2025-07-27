@@ -22,7 +22,7 @@ class CaperClient(CaperBase):
         server_hostname=CromwellRestAPI.DEFAULT_HOSTNAME,
         server_port=CromwellRestAPI.DEFAULT_PORT,
         server_heartbeat=None,
-    ):
+    ) -> None:
         """Initializes for Caper's client functions.
 
         Args:
@@ -49,10 +49,11 @@ class CaperClient(CaperBase):
                 server_hostname, server_port = res
 
         if not server_hostname or not server_port:
-            raise ValueError(
+            msg = (
                 'Server hostname/port must be defined '
                 'if server heartbeat is not available or timed out.'
             )
+            raise ValueError(msg)
 
         self._cromwell_rest_api = CromwellRestAPI(server_hostname, server_port)
 
@@ -67,7 +68,7 @@ class CaperClient(CaperBase):
         workflow_ids, labels = self._split_workflow_ids_and_labels(wf_ids_or_labels)
 
         r = self._cromwell_rest_api.abort(workflow_ids, labels)
-        logger.info('abort: {r}'.format(r=r))
+        logger.info('abort: %s', r)
         return r
 
     def unhold(self, wf_ids_or_labels):
@@ -81,7 +82,7 @@ class CaperClient(CaperBase):
         workflow_ids, labels = self._split_workflow_ids_and_labels(wf_ids_or_labels)
 
         r = self._cromwell_rest_api.release_hold(workflow_ids, labels)
-        logger.info('unhold: {r}'.format(r=r))
+        logger.info('unhold: %s', r)
         return r
 
     def list(self, wf_ids_or_labels=None, exclude_subworkflow=True):
@@ -104,7 +105,9 @@ class CaperClient(CaperBase):
             workflow_ids, labels = ['*'], None
 
         return self._cromwell_rest_api.find(
-            workflow_ids, labels, exclude_subworkflow=exclude_subworkflow
+            workflow_ids,
+            labels,
+            exclude_subworkflow=exclude_subworkflow,
         )
 
     def metadata(self, wf_ids_or_labels, embed_subworkflow=False):
@@ -124,7 +127,9 @@ class CaperClient(CaperBase):
         workflow_ids, labels = self._split_workflow_ids_and_labels(wf_ids_or_labels)
 
         return self._cromwell_rest_api.get_metadata(
-            workflow_ids, labels, embed_subworkflow=embed_subworkflow
+            workflow_ids,
+            labels,
+            embed_subworkflow=embed_subworkflow,
         )
 
     def _split_workflow_ids_and_labels(self, workflow_ids_or_labels):
@@ -166,7 +171,7 @@ class CaperClientSubmit(CaperClient):
         pbs_extra_param=None,
         lsf_queue=None,
         lsf_extra_param=None,
-    ):
+    ) -> None:
         """Submit subcommand needs much more parameters than other client subcommands.
 
         Args:
@@ -311,7 +316,8 @@ class CaperClientSubmit(CaperClient):
         """
         wdl_file = AutoURI(wdl)
         if not wdl_file.exists:
-            raise FileNotFoundError('WDL does not exists. {wdl}'.format(wdl=wdl))
+            msg = f'WDL does not exists. {wdl}'
+            raise FileNotFoundError(msg)
 
         if str_label is None and inputs:
             str_label = AutoURI(inputs).basename_wo_ext
@@ -329,12 +335,14 @@ class CaperClientSubmit(CaperClient):
             # backend's localization directory.
             # check if such loc_dir is defined.
             if self.get_loc_dir(backend) is None:
-                raise ValueError(
-                    'loc_dir is not defined for your backend. {b}'.format(b=backend)
-                )
+                msg = f'loc_dir is not defined for your backend. {backend}'
+                raise ValueError(msg)
 
             maybe_remote_file = self.localize_on_backend_if_modified(
-                inputs, backend=backend, recursive=not no_deepcopy, make_md5_file=True
+                inputs,
+                backend=backend,
+                recursive=not no_deepcopy,
+                make_md5_file=True,
             )
             inputs = AutoURI(maybe_remote_file).localize_on(work_dir)
 
@@ -367,10 +375,14 @@ class CaperClientSubmit(CaperClient):
             imports = wdl_parser.create_imports_file(work_dir)
 
         logger.debug(
-            'submit params: wdl={wdl}, imports={imp}, inputs={inp}, '
-            'options={opt}, labels={lbl}, hold={hold}'.format(
-                wdl=wdl, imp=imports, inp=inputs, opt=options, lbl=labels, hold=hold
-            )
+            'submit params: wdl=%s, imports=%s, inputs=%s, '
+            'options=%s, labels=%s, hold=%s',
+            wdl,
+            imports,
+            inputs,
+            options,
+            labels,
+            hold,
         )
 
         if not ignore_womtool:
@@ -382,7 +394,7 @@ class CaperClientSubmit(CaperClient):
             )
 
         if dry_run:
-            return
+            return None
 
         r = self._cromwell_rest_api.submit(
             source=wdl,
@@ -392,5 +404,5 @@ class CaperClientSubmit(CaperClient):
             labels=labels,
             on_hold=hold,
         )
-        logger.info('submit: {r}'.format(r=r))
+        logger.info(f'submit: {r}')
         return r

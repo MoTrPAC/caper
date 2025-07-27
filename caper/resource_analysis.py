@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import fnmatch
 import json
 import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from typing import Any, Callable
 
 import numpy as np
-from matplotlib import pyplot
+from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn import linear_model
 
@@ -28,18 +31,21 @@ class ResourceAnalysis(ABC):
     DEFAULT_REDUCE_IN_FILE_VARS = sum
     DEFAULT_TARGET_RESOURCES = ('stats.max.mem', 'stats.max.disk')
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Solves y = f(X) in a statistical way where
         X is a matrix vector of input file sizes (e.g. size_each([bam, bowtie2_index_tar, ...]))
         y is a vector of resources (e.g. [max_mem, max_disk, ...])
         """
-        self._task_resources = []
+        self._task_resources: list[dict[str, Any]] = []
 
     @property
-    def task_resources(self):
+    def task_resources(self) -> list[dict[str, Any]]:
         return self._task_resources
 
-    def collect_resource_data(self, metadata_jsons):
+    def collect_resource_data(
+        self,
+        metadata_jsons: list[str | dict[str, Any] | CromwellMetadata],
+    ) -> None:
         """Collect resource data from parsing metadata JSON files.
 
         self._task_resources is an extended (across all workflows) list of resource monitoring
@@ -68,11 +74,11 @@ class ResourceAnalysis(ABC):
 
     def analyze(
         self,
-        in_file_vars=None,
-        reduce_in_file_vars=DEFAULT_REDUCE_IN_FILE_VARS,
-        target_resources=DEFAULT_TARGET_RESOURCES,
-        plot_pdf=None,
-    ):
+        in_file_vars: dict[str, list[str]] | None = None,
+        reduce_in_file_vars: Callable | None = DEFAULT_REDUCE_IN_FILE_VARS,
+        target_resources: tuple[str, ...] = DEFAULT_TARGET_RESOURCES,
+        plot_pdf: str | None = None,
+    ) -> dict[str, dict[str, Any]]:
         """Find and analyze all tasks.
         Run `self.collect_resource_data()` first to collect resource data before analysis.
 
@@ -106,7 +112,7 @@ class ResourceAnalysis(ABC):
         if in_file_vars:
             all_tasks = in_file_vars.keys()
         else:
-            all_tasks = list(set([task['task_name'] for task in self.task_resources]))
+            all_tasks = list({task['task_name'] for task in self.task_resources})
 
         for task_name in all_tasks:
             result[task_name] = self.analyze_task(
@@ -117,19 +123,19 @@ class ResourceAnalysis(ABC):
                 plot_pp=plot_pp,
             )
 
-        if plot_pdf:
+        if plot_pdf and plot_pp:
             plot_pp.close()
 
         return result
 
     def analyze_task(
         self,
-        task_name,
-        in_file_vars=None,
-        reduce_in_file_vars=DEFAULT_REDUCE_IN_FILE_VARS,
-        target_resources=DEFAULT_TARGET_RESOURCES,
-        plot_pp=None,
-    ):
+        task_name: str,
+        in_file_vars: list[str] | None = None,
+        reduce_in_file_vars: Callable | None = DEFAULT_REDUCE_IN_FILE_VARS,
+        target_resources: tuple[str, ...] = DEFAULT_TARGET_RESOURCES,
+        plot_pp: PdfPages | None = None,
+    ) -> dict[str, Any]:
         """Does resource analysis on a task.
         Run `self.collect_resource_data()` first to collect resource data before analysis.
         Then you can such collected data for each task.
@@ -200,7 +206,7 @@ class ResourceAnalysis(ABC):
         x_data = defaultdict(list)
         y_data = defaultdict(list)
 
-        logger.info('Analyzing task={task}'.format(task=task_name))
+        logger.info('Analyzing task=%s', task_name)
         # first look at task's optional/empty input file vars across all workflows
         # e.g. SE (single-ended) pipeline runs does not have fastqs_R2
         # but we want to mix both SE/PE (paired-ended) data.
@@ -249,12 +255,12 @@ class ResourceAnalysis(ABC):
             )
             # transpose to reduce(sum by default) file sizes
             # over all in_file_vars
-            tranposed = np.transpose([vec for vec in x_data.values()])
+            tranposed = np.transpose(list(x_data.values()))
             reduced = [reduce_in_file_vars(vec) for vec in tranposed]
             x_data = {key: reduced}
 
         # tranpose it to make x matrix
-        x_matrix = np.transpose([vec for vec in x_data.values()])
+        x_matrix = np.transpose(list(x_data.values()))
 
         result = {'x': x_data, 'y': y_data, 'coeffs': {}}
         for res_metric, y_vec in y_data.items():
@@ -271,12 +277,26 @@ class ResourceAnalysis(ABC):
         return json.loads(json_str)
 
     @abstractmethod
-    def _solve(self, x_matrix, y_vec, plot_y_label=None, plot_title=None, plot_pp=None):
+    def _solve(
+        self,
+        x_matrix: np.ndarray,
+        y_vec: list[float],
+        plot_y_label: str | None = None,
+        plot_title: str | None = None,
+        plot_pp: PdfPages | None = None,
+    ) -> tuple[list[float], float] | None:
         raise NotImplementedError
 
 
 class LinearResourceAnalysis(ResourceAnalysis):
-    def _solve(self, x_matrix, y_vec, plot_y_label=None, plot_title=None, plot_pp=None):
+    def _solve(
+        self,
+        x_matrix: np.ndarray,
+        y_vec: list[float],
+        plot_y_label: str | None = None,
+        plot_title: str | None = None,
+        plot_pp: PdfPages | None = None,
+    ) -> tuple[list[float], float] | None:
         """Solve y = A(X) with linear regression.
         Also make a scatter plot (for one-dimensional x_matrix only).
         Use `reduce_in_file_vars` in ResourceAnalysis.analyze()
@@ -302,35 +322,30 @@ class LinearResourceAnalysis(ResourceAnalysis):
             model = linear_model.LinearRegression().fit(x_matrix, y_vec)
 
         except ValueError:
-            logger.error(
+            logger.exception(
                 'Failed to solve due to type/dim mismatch? '
                 'Too few data or invalid resource monitoring script? '
-                'title: {title}, y_label: {y_label}, '
-                'y_vec={y_vec}, x_matrix: {x_matrix}'.format(
-                    title=plot_title,
-                    y_label=plot_y_label,
-                    y_vec=y_vec,
-                    x_matrix=x_matrix,
-                ),
-                exc_info=True,
+                'title: %s, y_label: %s, '
+                'y_vec=%s, x_matrix: %s',
+                plot_title, plot_y_label, y_vec, x_matrix,
             )
-            return
+            return None
 
         if plot_pp:
             if x_matrix.shape[1] > 1:
                 logger.warning(
                     'Cannot make a 2D scatter plot. dim(x_matrix) > 1. '
-                    'Multi-dimensional analysis without reducing x matrix?'
+                    'Multi-dimensional analysis without reducing x matrix?',
                 )
             else:
                 x_vec = x_matrix[:, 0]
                 # scatter plot with a fitting line
-                pyplot.scatter(x_vec, y_vec, s=np.pi * 3, color=(0, 0, 0), alpha=0.5)
-                pyplot.plot(x_vec, model.coef_ * x_vec + model.intercept_)
-                pyplot.title(plot_title)
-                pyplot.xlabel('input_file_size')
-                pyplot.ylabel(plot_y_label)
-                pyplot.savefig(plot_pp, format='pdf')
-                pyplot.clf()
+                plt.scatter(x_vec, y_vec, s=np.pi * 3, color=(0, 0, 0), alpha=0.5)
+                plt.plot(x_vec, model.coef_ * x_vec + model.intercept_)
+                plt.title(plot_title)
+                plt.xlabel('input_file_size')
+                plt.ylabel(plot_y_label)
+                plt.savefig(plot_pp, format='pdf')
+                plt.clf()
 
         return list(model.coef_), model.intercept_

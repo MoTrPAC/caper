@@ -76,7 +76,7 @@ class CaperBackendConf:
         lsf_queue=None,
         lsf_extra_param=None,
         lsf_resource_param=CromwellBackendLsf.DEFAULT_LSF_RESOURCE_PARAM,
-    ):
+    ) -> None:
         """Initializes the backend conf's stanzas.
 
         Args:
@@ -144,7 +144,7 @@ class CaperBackendConf:
             gcp_compute_service_account:
                 The email of the GCP service account email to use for the Batch compute instances.
                 If not provided, the default Compute Engine service account will be used.
-                Ensure that this service account has the `roles/batch.agentReporter` role, so that 
+                Ensure that this service account has the `roles/batch.agentReporter` role, so that
                 VM instances can report their status to Batch.
             gcp_region:
                 Region for Google Cloud Batch API.
@@ -275,14 +275,11 @@ class CaperBackendConf:
         if gcp_prj and gcp_out_dir:
             if gcp_service_account_key_json:
                 gcp_service_account_key_json = os.path.expanduser(
-                    gcp_service_account_key_json
+                    gcp_service_account_key_json,
                 )
                 if not os.path.exists(gcp_service_account_key_json):
-                    raise FileNotFoundError(
-                        'gcp_service_account_key_json does not exist. f={f}'.format(
-                            f=gcp_service_account_key_json
-                        )
-                    )
+                    msg = f'gcp_service_account_key_json does not exist. f={gcp_service_account_key_json}'
+                    raise FileNotFoundError(msg)
 
             merge_dict(
                 self._template,
@@ -341,38 +338,41 @@ class CaperBackendConf:
 
         if backend == BACKEND_SGE:
             if self._sge_pe is None:
-                raise ValueError(
+                msg = (
                     'sge-pe (Sun GridEngine parallel environment) '
                     'is required for backend sge.'
                 )
+                raise ValueError(msg)
         elif backend == BACKEND_GCP:
             if self._gcp_prj is None:
-                raise ValueError(
+                msg = (
                     'gcp-prj (Google Cloud Platform project) '
                     'is required for backend gcp.'
                 )
+                raise ValueError(msg)
             if self._gcp_out_dir is None:
-                raise ValueError(
+                msg = (
                     'gcp-out-dir (gs:// output bucket path) '
                     'is required for backend gcp.'
                 )
+                raise ValueError(msg)
         elif backend == BACKEND_AWS:
             if self._aws_batch_arn is None:
-                raise ValueError(
-                    'aws-batch-arn (ARN for AWS Batch) ' 'is required for backend aws.'
-                )
+                msg = 'aws-batch-arn (ARN for AWS Batch) is required for backend aws.'
+                raise ValueError(msg)
             if self._aws_region is None:
-                raise ValueError(
-                    'aws-region (AWS region) ' 'is required for backend aws.'
-                )
+                msg = 'aws-region (AWS region) is required for backend aws.'
+                raise ValueError(msg)
             if self._aws_out_dir is None:
-                raise ValueError(
+                msg = (
                     'aws-out-dir (s3:// output bucket path) '
                     'is required for backend aws.'
                 )
+                raise ValueError(msg)
 
         hocon_s = HOCONString.from_dict(
-            template, include=CaperBackendConf.BACKEND_CONF_INCLUDE
+            template,
+            include=CaperBackendConf.BACKEND_CONF_INCLUDE,
         )
 
         if custom_backend_conf is not None:

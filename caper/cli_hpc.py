@@ -1,12 +1,13 @@
 import logging
 import sys
+from typing import Any
 
 from .hpc import LsfWrapper, PbsWrapper, SgeWrapper, SlurmWrapper
 
 logger = logging.getLogger(__name__)
 
 
-def make_caper_run_command_for_hpc_submit():
+def make_caper_run_command_for_hpc_submit() -> list[str]:
     """Makes `caper run ...` command from `caper hpc submit` command by simply
     replacing `caper hpc submit` with `caper run`.
     This also escapes double quotes in caper run command.
@@ -17,43 +18,47 @@ def make_caper_run_command_for_hpc_submit():
         new_argv.pop(2)
         new_argv[1] = 'run'
         return new_argv
-    else:
-        raise ValueError('Wrong HPC command')
+    msg = 'Wrong HPC command'
+    raise ValueError(msg)
 
 
-def subcmd_hpc(args):
+def subcmd_hpc(args: Any) -> None:
     if args.hpc_action == 'submit':
-
         if args.leader_job_name is None:
+            msg = 'Define --leader-job-name [LEADER_JOB_NAME] in the command line arguments.'
             raise ValueError(
-                'Define --leader-job-name [LEADER_JOB_NAME] in the command line arguments.'
+                msg,
             )
         caper_run_command = make_caper_run_command_for_hpc_submit()
 
         if args.backend == 'slurm':
-            stdout = SlurmWrapper(
+            SlurmWrapper(
                 args.slurm_leader_job_resource_param.split(),
                 args.slurm_partition,
                 args.slurm_account,
             ).submit(args.leader_job_name, caper_run_command)
 
         elif args.backend == 'sge':
-            stdout = SgeWrapper(
-                args.sge_leader_job_resource_param.split(), args.sge_queue
+            SgeWrapper(
+                args.sge_leader_job_resource_param.split(),
+                args.sge_queue,
             ).submit(args.leader_job_name, caper_run_command)
 
         elif args.backend == 'pbs':
-            stdout = PbsWrapper(
-                args.pbs_leader_job_resource_param.split(), args.pbs_queue
+            PbsWrapper(
+                args.pbs_leader_job_resource_param.split(),
+                args.pbs_queue,
             ).submit(args.leader_job_name, caper_run_command)
 
         elif args.backend == 'lsf':
-            stdout = LsfWrapper(
-                args.lsf_leader_job_resource_param.split(), args.lsf_queue
+            LsfWrapper(
+                args.lsf_leader_job_resource_param.split(),
+                args.lsf_queue,
             ).submit(args.leader_job_name, caper_run_command)
 
         else:
-            raise ValueError('Unsupported backend {b} for hpc'.format(b=args.backend))
+            msg = f'Unsupported backend {args.backend} for hpc'
+            raise ValueError(msg)
     else:
         if args.backend == 'slurm':
             hpc_wrapper = SlurmWrapper()
@@ -64,15 +69,15 @@ def subcmd_hpc(args):
         elif args.backend == 'lsf':
             hpc_wrapper = LsfWrapper()
         else:
-            raise ValueError('Unsupported backend {b} for hpc'.format(b=args.backend))
+            msg = f'Unsupported backend {args.backend} for hpc'
+            raise ValueError(msg)
 
         if args.hpc_action == 'list':
-            stdout = hpc_wrapper.list()
+            hpc_wrapper.list()
 
         elif args.hpc_action == 'abort':
-            stdout = hpc_wrapper.abort(args.job_ids)
+            hpc_wrapper.abort(args.job_ids)
 
         else:
-            raise ValueError('Unsupported hpc action {act}'.format(act=args.hpc_action))
-
-    print(stdout)
+            msg = f'Unsupported hpc action {args.hpc_action}'
+            raise ValueError(msg)

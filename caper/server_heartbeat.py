@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
 import socket
 import time
 from threading import Thread
+from typing import NoReturn
 
 from autouri import AutoURI
 
@@ -19,10 +22,10 @@ class ServerHeartbeat:
 
     def __init__(
         self,
-        heartbeat_file=DEFAULT_SERVER_HEARTBEAT_FILE,
-        heartbeat_timeout=DEFAULT_HEARTBEAT_TIMEOUT_MS,
-        interval_update_heartbeat=DEFAULT_INTERVAL_UPDATE_HEARTBEAT_SEC,
-    ):
+        heartbeat_file: str = DEFAULT_SERVER_HEARTBEAT_FILE,
+        heartbeat_timeout: int = DEFAULT_HEARTBEAT_TIMEOUT_MS,
+        interval_update_heartbeat: float = DEFAULT_INTERVAL_UPDATE_HEARTBEAT_SEC,
+    ) -> None:
         """Server heartbeat to share store server's hostname/port with clients.
 
         Args:
@@ -40,9 +43,9 @@ class ServerHeartbeat:
         self._interval_update_heartbeat = interval_update_heartbeat
 
         self._stop_it = False
-        self._thread = None
+        self._thread: Thread | None = None
 
-    def start(self, port, hostname=None):
+    def start(self, port: int, hostname: str | None = None) -> Thread:
         """Starts a thread that writes hostname/port of a server
         on a heartbeat file.
 
@@ -57,16 +60,16 @@ class ServerHeartbeat:
         self._thread.start()
         return self._thread
 
-    def is_alive(self):
+    def is_alive(self) -> bool:
         return self._thread.is_alive() if self._thread else False
 
-    def stop(self):
+    def stop(self) -> None:
         self._stop_it = True
 
         if self._thread:
             self._thread.join()
 
-    def read(self, raise_timeout=False):
+    def read(self, raise_timeout: bool = False) -> tuple[str, int] | None:
         """Read from heartbeat file.
         If a heartbeat file is not fresh (mtime difference < timeout)
         then None is returned.
@@ -78,31 +81,30 @@ class ServerHeartbeat:
             u = AutoURI(self._heartbeat_file)
             if (time.time() - u.mtime) * 1000.0 > self._heartbeat_timeout:
                 raise ServerHeartbeatTimeoutError
-            else:
-                hostname, port = u.read().strip('\n').split(':')
-                logger.info(
-                    'Reading hostname/port from a heartbeat file. {h}:{p}'.format(
-                        h=hostname, p=port
-                    )
-                )
-                return hostname, int(port)
+            hostname, port = u.read().strip('\n').split(':')
+            logger.info(
+                'Reading hostname/port from a heartbeat file. %s:%s',
+                hostname, port,
+            )
+            return hostname, int(port)
 
         except ServerHeartbeatTimeoutError:
-            logger.error(
+            logger.exception(
                 'Found a heartbeat file but it has been expired (> timeout)'
-                '. {f}'.format(f=self._heartbeat_file)
+                '. %s',
+                self._heartbeat_file,
             )
             if raise_timeout:
                 raise
 
         except Exception:
-            logger.error(
-                'Failed to read from a heartbeat file. {f}'.format(
-                    f=self._heartbeat_file
-                )
+            logger.exception(
+                'Failed to read from a heartbeat file. %s',
+                self._heartbeat_file,
             )
+        return None
 
-    def _write_to_file(self, port, hostname=None):
+    def _write_to_file(self, port: int, hostname: str | None = None) -> None:
         if not hostname:
             hostname = socket.gethostname()
 
@@ -111,18 +113,16 @@ class ServerHeartbeat:
         while True:
             try:
                 logger.debug(
-                    'Writing heartbeat: {hostname}, {port}'.format(
-                        hostname=hostname, port=port
-                    )
+                    'Writing heartbeat: %s, %s',
+                    hostname, port,
                 )
                 AutoURI(self._heartbeat_file).write(
-                    '{hostname}:{port}'.format(hostname=hostname, port=port)
+                    f'{hostname}:{port}',
                 )
             except Exception:
-                logger.error(
-                    'Failed to write to a heartbeat_file. {f}'.format(
-                        f=self._heartbeat_file
-                    )
+                logger.exception(
+                    'Failed to write to a heartbeat_file. %s',
+                    self._heartbeat_file,
                 )
             cnt = 0
             while cnt < self._interval_update_heartbeat:

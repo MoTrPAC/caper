@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from .wdl_parser import WDLParser
 
@@ -19,16 +20,16 @@ class CaperWDLParser(WDLParser):
         'caper_conda_env',
     )
 
-    def __init__(self, wdl):
+    def __init__(self, wdl: str) -> None:
         super().__init__(wdl)
 
     @property
-    def caper_docker(self):
+    def caper_docker(self) -> Optional[str]:
         """Backward compatibility for property name. See property default_docker."""
         return self.default_docker
 
     @property
-    def default_docker(self):
+    def default_docker(self) -> Optional[str]:
         """Find a default Docker image in WDL for Caper.
 
         Backward compatibililty:
@@ -43,14 +44,15 @@ class CaperWDLParser(WDLParser):
         ret = self._find_val_of_matched_lines(CaperWDLParser.RE_WDL_COMMENT_DOCKER)
         if ret:
             return ret[0].strip('"\'')
+        return None
 
     @property
-    def caper_singularity(self):
+    def caper_singularity(self) -> Optional[str]:
         """Backward compatibility for property name. See property default_singularity."""
         return self.default_singularity
 
     @property
-    def default_singularity(self):
+    def default_singularity(self) -> Optional[str]:
         """Find a default Singularity image in WDL for Caper.
 
         Backward compatibililty:
@@ -65,11 +67,14 @@ class CaperWDLParser(WDLParser):
         ret = self._find_val_of_matched_lines(CaperWDLParser.RE_WDL_COMMENT_SINGULARITY)
         if ret:
             return ret[0].strip('"\'')
+        return None
 
     @property
-    def default_conda(self):
+    def default_conda(self) -> Optional[str]:
         """Find a default Conda environment name in WDL for Caper."""
         if self.workflow_meta:
             for conda_key in CaperWDLParser.WDL_WORKFLOW_META_CONDA_KEYS:
                 if conda_key in self.workflow_meta:
                     return self.workflow_meta[conda_key]
+            return None
+        return None

@@ -1,8 +1,13 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
 import logging
 import os
 import re
 import shutil
 from tempfile import TemporaryDirectory
+from typing import Any
+from pathlib import Path
 
 from autouri import HTTPURL, AbsPath, AutoURI
 from WDL import parse_document
@@ -15,47 +20,52 @@ class WDLParser:
     RECURSION_DEPTH_LIMIT = 20
     BASENAME_IMPORTS = 'imports.zip'
 
-    def __init__(self, wdl):
+    def __init__(self, wdl: str) -> None:
         """Wraps miniwdl's parse_document()."""
         u = AutoURI(wdl)
         if not u.exists:
-            raise FileNotFoundError('WDL does not exist: wdl={wdl}'.format(wdl=wdl))
+            msg = f'WDL does not exist: wdl={wdl}'
+            raise FileNotFoundError(msg)
         self._wdl = wdl
         self._wdl_contents = AutoURI(wdl).read()
         try:
             self._wdl_doc = parse_document(self._wdl_contents)
         except Exception:
-            logger.error('Failed to parse WDL with miniwdl.')
+            logger.exception('Failed to parse WDL with miniwdl.')
             self._wdl_doc = None
 
     @property
-    def contents(self):
+    def contents(self) -> str:
         return self._wdl_contents
 
     @property
-    def workflow_meta(self):
-        if self._wdl_doc:
+    def workflow_meta(self) -> Mapping[str, Any] | None:
+        if self._wdl_doc and self._wdl_doc.workflow:
             return self._wdl_doc.workflow.meta
+        return None
 
     @property
-    def workflow_parameter_meta(self):
-        if self._wdl_doc:
+    def workflow_parameter_meta(self) -> Mapping[str, Any] | None:
+        if self._wdl_doc and self._wdl_doc.workflow:
             return self._wdl_doc.workflow.parameter_meta
+        return None
 
     @property
-    def imports(self):
+    def imports(self) -> list[str]:
         """Miniwdl (0.3.7) has a bug for URL imports.
         Keep using reg-ex to find imports until it's fixed.
         Returns:
             List of URIs of imported subworkflows.
         """
+        if self._wdl_doc is None:
+            return []
         try:
             return [i.uri for i in self._wdl_doc.imports]
-        except Exception:
-            pass
+        except (AttributeError, TypeError):
+            logger.debug('Could not get imports from wdl_doc.', exc_info=True)
         return self._find_val_of_matched_lines(WDLParser.RE_WDL_IMPORT)
 
-    def zip_subworkflows(self, zip_file):
+    def zip_subworkflows(self, zip_file: str) -> str | None:
         """Recursively find/zip imported subworkflow WDLs
         This will zip sub-WDLs with relative paths only.
         i.e. URIs are ignored.
@@ -72,21 +82,32 @@ class WDLParser:
             wdl = AutoURI(self._wdl).localize_on(tmp_d)
             # keep directory structure as they imported
             num_sub_wf_packed = self.__recurse_zip_subworkflows(
-                root_zip_dir=tmp_d, root_wdl_dir=AutoURI(wdl).dirname
+                root_zip_dir=tmp_d,
+                root_wdl_dir=AutoURI(wdl).dirname,
             )
             if num_sub_wf_packed:
                 shutil.make_archive(AutoURI(zip_file).uri_wo_ext, 'zip', tmp_d)
                 return zip_file
+        return None
 
-    def create_imports_file(self, directory, basename=BASENAME_IMPORTS):
+    def create_imports_file(
+        self,
+        directory: str,
+        basename: str = BASENAME_IMPORTS,
+    ) -> str | None:
         """Wrapper for zip_subworkflows.
         This creates an imports zip file with basename on directory.
         """
-        zip_file = os.path.join(directory, basename)
+        zip_file = str(Path(directory) / basename)
         if self.zip_subworkflows(zip_file):
             return zip_file
+        return None
 
-    def _find_val_of_matched_lines(self, regex, no_strip=False):
+    def _find_val_of_matched_lines(
+        self,
+        regex: str,
+        no_strip: bool = False,
+    ) -> list[str]:
         """Find value of the first line matching regex.
         Args:
             regex:
@@ -104,8 +125,12 @@ class WDLParser:
         return res
 
     def __recurse_zip_subworkflows(
-        self, root_zip_dir, root_wdl_dir, imported_as_url=False, depth=0
-    ):
+        self,
+        root_zip_dir: str,
+        root_wdl_dir: str,
+        imported_as_url: bool = False,
+        depth: int = 0,
+    ) -> int:
         """Recurse imported sub-WDLs in main-WDL.
         Unlike Cromwell, Womtool does not take imports.zip while validating WDLs.
         All sub-WDLs should be in a correct directory structure relative to the
@@ -125,17 +150,15 @@ class WDLParser:
                 Sub WDL files "recursively" localized on "root_zip_dir".
         """
         if depth > WDLParser.RECURSION_DEPTH_LIMIT:
-            raise ValueError(
+            msg = (
                 'Reached recursion depth limit while zipping subworkflows recursively. '
-                'Possible cyclic import or self-refencing in WDLs? wdl={wdl}'.format(
-                    wdl=self._wdl
-                )
+                f'Possible cyclic import or self-refencing in WDLs? wdl={self._wdl}'
+            )
+            raise ValueError(
+                msg,
             )
 
-        if imported_as_url:
-            main_wdl_dir = root_wdl_dir
-        else:
-            main_wdl_dir = AbsPath(self._wdl).dirname
+        main_wdl_dir = root_wdl_dir if imported_as_url else AbsPath(self._wdl).dirname
 
         num_sub_wf_packed = 0
         for sub_rel_to_parent in self.imports:
@@ -145,38 +168,39 @@ class WDLParser:
                 sub_abs = sub_wdl_file.uri
                 imported_as_url_sub = True
             elif isinstance(sub_wdl_file, AbsPath):
-                raise ValueError(
+                msg = (
                     'For sub WDL zipping, absolute path is not allowed for sub WDL. '
-                    'main={main}, sub={sub}'.format(
-                        main=self._wdl, sub=sub_rel_to_parent
-                    )
+                    f'main={self._wdl}, sub={sub_rel_to_parent}'
                 )
+                raise TypeError(msg)
             else:
                 sub_abs = os.path.realpath(
-                    os.path.join(main_wdl_dir, sub_rel_to_parent)
+                    str(Path(main_wdl_dir) / sub_rel_to_parent),
                 )
                 if not AbsPath(sub_abs).exists:
-                    raise FileNotFoundError(
+                    msg = (
                         'Sub WDL does not exist. Did you import main WDL '
                         'as a URL but sub WDL references a local file? '
-                        'main={main}, sub={sub}, imported_as_url={i}'.format(
-                            main=self._wdl, sub=sub_rel_to_parent, i=imported_as_url
-                        )
+                        f'main={self._wdl}, sub={sub_rel_to_parent}, imported_as_url={imported_as_url}'
+                    )
+                    raise FileNotFoundError(
+                        msg,
                     )
                 if not sub_abs.startswith(root_wdl_dir):
-                    raise ValueError(
+                    msg = (
                         'Sub WDL exists but it is out of root WDL directory. '
                         'Too many "../" in your sub WDL? '
                         'Or main WDL is imported as an URL but sub WDL '
                         'has "../"? '
-                        'main={main}, sub={sub}, imported_as_url={i}'.format(
-                            main=self._wdl, sub=sub_rel_to_parent, i=imported_as_url
-                        )
+                        f'main={self._wdl}, sub={sub_rel_to_parent}, imported_as_url={imported_as_url}'
+                    )
+                    raise ValueError(
+                        msg,
                     )
 
                 # make a copy on zip_dir
                 rel_path = os.path.relpath(sub_abs, root_wdl_dir)
-                cp_dest = os.path.join(root_zip_dir, rel_path)
+                cp_dest = str(Path(root_zip_dir) / rel_path)
 
                 AbsPath(sub_abs).cp(cp_dest)
                 num_sub_wf_packed += 1

@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+from __future__ import annotations
+
 import copy
 import csv
 import json
@@ -9,7 +10,6 @@ import sys
 
 from autouri import GCSURI, AutoURI
 
-from . import __version__ as version
 from .caper_args import ResourceAnalysisReductionMethod, get_parser_and_defaults
 from .caper_client import CaperClient, CaperClientSubmit
 from .caper_init import init_caper_conf
@@ -52,9 +52,8 @@ def get_abspath(path):
     To do so, use this function for local file path strings only (e.g. toy.wdl).
     Do not use this function for other non-local-path strings (e.g. --docker).
     """
-    if path:
-        if not AutoURI(path).is_valid:
-            return os.path.abspath(os.path.expanduser(path))
+    if path and not AutoURI(path).is_valid:
+        return os.path.abspath(os.path.expanduser(path))
     return path
 
 
@@ -67,30 +66,27 @@ def check_local_file_and_rename_if_exists(path, index=0):
     return path
 
 
-def print_version(parser, args):
+def print_version(parser, args) -> None:
     if args.version:
-        print(version)
         parser.exit()
 
 
-def init_logging(args):
-    if args.debug:
-        log_level = 'DEBUG'
-    else:
-        log_level = 'INFO'
+def init_logging(args) -> None:
+    log_level = 'DEBUG' if args.debug else 'INFO'
     logging.basicConfig(
-        level=log_level, format='%(asctime)s|%(name)s|%(levelname)s| %(message)s'
+        level=log_level,
+        format='%(asctime)s|%(name)s|%(levelname)s| %(message)s',
     )
     # suppress filelock logging
     logging.getLogger('filelock').setLevel('CRITICAL')
 
 
-def init_autouri(args):
+def init_autouri(args) -> None:
     if hasattr(args, 'use_gsutil_for_s3'):
         GCSURI.init_gcsuri(use_gsutil_for_s3=args.use_gsutil_for_s3)
 
 
-def check_flags(args):
+def check_flags(args) -> None:
     singularity_flag = False
     docker_flag = False
     conda_flag = False
@@ -98,42 +94,55 @@ def check_flags(args):
     if hasattr(args, 'singularity') and args.singularity is not None:
         singularity_flag = True
         if args.singularity.endswith(('.wdl', '.cwl')):
-            raise ValueError(
+            msg = (
                 '--singularity ate up positional arguments (e.g. WDL, CWL). '
                 'Define --singularity at the end of command line arguments. '
-                'singularity={p}'.format(p=args.singularity)
+                f'singularity={args.singularity}'
+            )
+            raise ValueError(
+                msg,
             )
 
     if hasattr(args, 'docker') and args.docker is not None:
         docker_flag = True
         if args.docker.endswith(('.wdl', '.cwl')):
-            raise ValueError(
+            msg = (
                 '--docker ate up positional arguments (e.g. WDL, CWL). '
                 'Define --docker at the end of command line arguments. '
-                'docker={p}'.format(p=args.docker)
+                f'docker={args.docker}'
+            )
+            raise ValueError(
+                msg,
             )
         if hasattr(args, 'soft_glob_output') and args.soft_glob_output:
-            raise ValueError(
+            msg = (
                 '--soft-glob-output and --docker are mutually exclusive. '
                 'Delocalization from docker container will fail '
                 'for soft-linked globbed outputs.'
+            )
+            raise ValueError(
+                msg,
             )
 
     if hasattr(args, 'conda') and args.conda is not None:
         conda_flag = True
         if args.conda.endswith(('.wdl', '.cwl')):
-            raise ValueError(
+            msg = (
                 '--conda ate up positional arguments (e.g. WDL, CWL). '
                 'Define --conda at the end of command line arguments. '
-                'conda={p}'.format(p=args.conda)
+                f'conda={args.conda}'
+            )
+            raise ValueError(
+                msg,
             )
 
     all_flags = (docker_flag, singularity_flag, conda_flag)
     if len([flag for flag in all_flags if flag]) > 1:
-        raise ValueError('--docker, --singularity and --conda are mutually exclusive.')
+        msg = '--docker, --singularity and --conda are mutually exclusive.'
+        raise ValueError(msg)
 
 
-def check_dirs(args):
+def check_dirs(args) -> None:
     """Convert local directories (local_out_dir, local_loc_dir) to absolute ones.
     Also, if temporary/cache directory is not defined for each storage,
     then append ".caper_tmp" on output directory and use it.
@@ -142,30 +151,31 @@ def check_dirs(args):
         args.local_out_dir = get_abspath(args.local_out_dir)
         if not args.local_loc_dir:
             args.local_loc_dir = os.path.join(
-                args.local_out_dir, CaperRunner.DEFAULT_LOC_DIR_NAME
+                args.local_out_dir,
+                CaperRunner.DEFAULT_LOC_DIR_NAME,
             )
-    else:
-        if not args.local_loc_dir:
-            args.local_loc_dir = os.path.join(
-                os.getcwd(), CaperRunner.DEFAULT_LOC_DIR_NAME
-            )
+    elif not args.local_loc_dir:
+        args.local_loc_dir = os.path.join(
+            os.getcwd(),
+            CaperRunner.DEFAULT_LOC_DIR_NAME,
+        )
 
     args.local_loc_dir = get_abspath(args.local_loc_dir)
 
-    if hasattr(args, 'gcp_out_dir'):
-        if args.gcp_out_dir and not args.gcp_loc_dir:
-            args.gcp_loc_dir = os.path.join(
-                args.gcp_out_dir, CaperRunner.DEFAULT_LOC_DIR_NAME
-            )
+    if hasattr(args, 'gcp_out_dir') and args.gcp_out_dir and not args.gcp_loc_dir:
+        args.gcp_loc_dir = os.path.join(
+            args.gcp_out_dir,
+            CaperRunner.DEFAULT_LOC_DIR_NAME,
+        )
 
-    if hasattr(args, 'aws_out_dir'):
-        if args.aws_out_dir and not args.aws_loc_dir:
-            args.aws_loc_dir = os.path.join(
-                args.aws_out_dir, CaperRunner.DEFAULT_LOC_DIR_NAME
-            )
+    if hasattr(args, 'aws_out_dir') and args.aws_out_dir and not args.aws_loc_dir:
+        args.aws_loc_dir = os.path.join(
+            args.aws_out_dir,
+            CaperRunner.DEFAULT_LOC_DIR_NAME,
+        )
 
 
-def check_db_path(args):
+def check_db_path(args) -> None:
     if hasattr(args, 'db') and args.db == CromwellBackendDatabase.DB_FILE:
         args.file_db = get_abspath(args.file_db)
 
@@ -179,7 +189,7 @@ def check_db_path(args):
             args.file_db = os.path.join(args.local_out_dir, db_filename)
 
 
-def check_backend(args):
+def check_backend(args) -> None:
     """Check if local backend is in lower cases.
     "Local" should be capitalized. i.e. local -> Local.
     BACKEND_LOCAL is Local.
@@ -194,7 +204,8 @@ def runner(args, nonblocking_server=False):
         args.gcp_zones = re.split(REGEX_DELIMITER_PARAMS, args.gcp_zones)
     if args.memory_retry_error_keys:
         args.memory_retry_error_keys = re.split(
-            REGEX_DELIMITER_PARAMS, args.memory_retry_error_keys
+            REGEX_DELIMITER_PARAMS,
+            args.memory_retry_error_keys,
         )
 
     c = CaperRunner(
@@ -253,15 +264,16 @@ def runner(args, nonblocking_server=False):
 
     if args.action == 'run':
         subcmd_run(c, args)
+        return None
 
-    elif args.action == 'server':
+    if args.action == 'server':
         return subcmd_server(c, args, nonblocking=nonblocking_server)
 
-    else:
-        raise ValueError('Unsupported runner action {act}'.format(act=args.action))
+    msg = f'Unsupported runner action {args.action}'
+    raise ValueError(msg)
 
 
-def client(args):
+def client(args) -> None:
     sh = None
     if not args.no_server_heartbeat:
         sh = ServerHeartbeat(
@@ -323,7 +335,8 @@ def client(args):
         elif args.action == 'cleanup':
             subcmd_cleanup(c, args)
         else:
-            raise ValueError('Unsupported client action {act}'.format(act=args.action))
+            msg = f'Unsupported client action {args.action}'
+            raise ValueError(msg)
 
 
 def subcmd_server(caper_runner, args, nonblocking=False):
@@ -357,9 +370,9 @@ def subcmd_server(caper_runner, args, nonblocking=False):
         return caper_runner.server(fileobj_stdout=sys.stdout, **args_from_cli)
 
     cromwell_stdout = check_local_file_and_rename_if_exists(
-        get_abspath(args.cromwell_stdout)
+        get_abspath(args.cromwell_stdout),
     )
-    logger.info('Cromwell stdout: {stdout}'.format(stdout=cromwell_stdout))
+    logger.info(f'Cromwell stdout: {cromwell_stdout}')
 
     with open(cromwell_stdout, 'w') as f:
         try:
@@ -368,17 +381,17 @@ def subcmd_server(caper_runner, args, nonblocking=False):
                 thread.join()
                 thread.stop(wait=True)
                 if thread.returncode:
-                    logger.error('Check stdout in {file}'.format(file=cromwell_stdout))
+                    logger.error(f'Check stdout in {cromwell_stdout}')
 
         except KeyboardInterrupt:
             logger.error(USER_INTERRUPT_WARNING, exc_info=True)
 
 
-def subcmd_run(caper_runner, args):
+def subcmd_run(caper_runner, args) -> None:
     cromwell_stdout = check_local_file_and_rename_if_exists(
-        get_abspath(args.cromwell_stdout)
+        get_abspath(args.cromwell_stdout),
     )
-    logger.info('Cromwell stdout: {stdout}'.format(stdout=cromwell_stdout))
+    logger.info(f'Cromwell stdout: {cromwell_stdout}')
 
     with open(cromwell_stdout, 'w') as f:
         try:
@@ -410,13 +423,13 @@ def subcmd_run(caper_runner, args):
                 thread.join()
                 thread.stop(wait=True)
                 if thread.returncode:
-                    logger.error('Check stdout in {file}'.format(file=cromwell_stdout))
+                    logger.error(f'Check stdout in {cromwell_stdout}')
 
         except KeyboardInterrupt:
             logger.error(USER_INTERRUPT_WARNING, exc_info=True)
 
 
-def subcmd_submit(caper_client, args):
+def subcmd_submit(caper_client, args) -> None:
     caper_client.submit(
         wdl=get_abspath(args.wdl),
         backend=args.backend,
@@ -439,17 +452,18 @@ def subcmd_submit(caper_client, args):
     )
 
 
-def subcmd_abort(caper_client, args):
+def subcmd_abort(caper_client, args) -> None:
     caper_client.abort(args.wf_id_or_label)
 
 
-def subcmd_unhold(caper_client, args):
+def subcmd_unhold(caper_client, args) -> None:
     caper_client.unhold(args.wf_id_or_label)
 
 
-def subcmd_list(caper_client, args):
+def subcmd_list(caper_client, args) -> None:
     workflows = caper_client.list(
-        args.wf_id_or_label, exclude_subworkflow=not args.show_subworkflow
+        args.wf_id_or_label,
+        exclude_subworkflow=not args.show_subworkflow,
     )
 
     try:
@@ -465,12 +479,10 @@ def subcmd_list(caper_client, args):
             workflow_id = w.get('id')
             parent_workflow_id = w.get('parentWorkflowId')
 
-            if args.hide_result_before is not None:
-                if (
-                    w.get('submission')
-                    and w.get('submission') <= args.hide_result_before
-                ):
-                    continue
+            if args.hide_result_before is not None and (
+                w.get('submission') and w.get('submission') <= args.hide_result_before
+            ):
+                continue
             for f in formats:
                 if f == 'workflow_id':
                     row.append(str(workflow_id))
@@ -496,30 +508,37 @@ def subcmd_list(caper_client, args):
         logger.debug('Ignored BrokenPipeError.')
 
 
-def subcmd_metadata(caper_client, args):
+def subcmd_metadata(caper_client, args) -> None:
     m = caper_client.metadata(
-        wf_ids_or_labels=args.wf_id_or_label, embed_subworkflow=True
+        wf_ids_or_labels=args.wf_id_or_label,
+        embed_subworkflow=True,
     )
     if not m:
-        raise ValueError('Found no workflow matching with search query.')
-    elif len(m) > 1:
-        raise ValueError('Found multiple workflow matching with search query.')
-
-    print(json.dumps(m[0], indent=4))
+        msg = 'Found no workflow matching with search query.'
+        raise ValueError(msg)
+    if len(m) > 1:
+        msg = 'Found multiple workflow matching with search query.'
+        raise ValueError(msg)
 
 
 def get_single_cromwell_metadata_obj(caper_client, args, subcmd):
     if not args.wf_id_or_label:
-        raise ValueError(
+        msg = (
             'Define at least one metadata JSON file or '
             'a search query for workflow ID/string label '
             'if there is a running Caper server.'
         )
-    elif len(args.wf_id_or_label) > 1:
         raise ValueError(
-            'Multiple files/queries are not allowed for {subcmd}. '
+            msg,
+        )
+    if len(args.wf_id_or_label) > 1:
+        msg = (
+            f'Multiple files/queries are not allowed for {subcmd}. '
             'Define one metadata JSON file or a search query '
-            'for workflow ID/string label.'.format(subcmd=subcmd)
+            'for workflow ID/string label.'
+        )
+        raise ValueError(
+            msg,
         )
 
     metadata_file = AutoURI(get_abspath(args.wf_id_or_label[0]))
@@ -528,12 +547,15 @@ def get_single_cromwell_metadata_obj(caper_client, args, subcmd):
         metadata = json.loads(metadata_file.read())
     else:
         metadata_objs = caper_client.metadata(
-            wf_ids_or_labels=args.wf_id_or_label, embed_subworkflow=True
+            wf_ids_or_labels=args.wf_id_or_label,
+            embed_subworkflow=True,
         )
         if len(metadata_objs) > 1:
-            raise ValueError('Found multiple workflows matching with search query.')
-        elif len(metadata_objs) == 0:
-            raise ValueError('Found no workflow matching with search query.')
+            msg = 'Found multiple workflows matching with search query.'
+            raise ValueError(msg)
+        if len(metadata_objs) == 0:
+            msg = 'Found no workflow matching with search query.'
+            raise ValueError(msg)
         metadata = metadata_objs[0]
 
     return CromwellMetadata(metadata)
@@ -555,10 +577,13 @@ def split_list_into_file_and_non_file(lst):
 
 def get_multi_cromwell_metadata_objs(caper_client, args):
     if not args.wf_id_or_label:
-        raise ValueError(
+        msg = (
             'Define at least one metadata JSON file or '
             'a search query for workflow ID/string label '
             'if there is a running Caper server.'
+        )
+        raise ValueError(
+            msg,
         )
 
     files, non_files = split_list_into_file_and_non_file(args.wf_id_or_label)
@@ -570,24 +595,26 @@ def get_multi_cromwell_metadata_objs(caper_client, args):
 
     if non_files:
         all_metadata.extend(
-            caper_client.metadata(wf_ids_or_labels=non_files, embed_subworkflow=True)
+            caper_client.metadata(wf_ids_or_labels=non_files, embed_subworkflow=True),
         )
 
     if not all_metadata:
-        raise ValueError('Found no metadata/workflow matching with search query.')
+        msg = 'Found no metadata/workflow matching with search query.'
+        raise ValueError(msg)
     return [CromwellMetadata(m) for m in all_metadata]
 
 
-def subcmd_troubleshoot(caper_client, args):
+def subcmd_troubleshoot(caper_client, args) -> None:
     cm = get_single_cromwell_metadata_obj(caper_client, args, 'troubleshoot/debug')
     sys.stdout.write(
         cm.troubleshoot(
-            show_completed_task=args.show_completed_task, show_stdout=args.show_stdout
-        )
+            show_completed_task=args.show_completed_task,
+            show_stdout=args.show_stdout,
+        ),
     )
 
 
-def subcmd_gcp_monitor(caper_client, args):
+def subcmd_gcp_monitor(caper_client, args) -> None:
     """Prints out monitoring result either in a TSV format or in a JSON one.
 
     TSV format:
@@ -607,7 +634,7 @@ def subcmd_gcp_monitor(caper_client, args):
         result.extend(metadata.gcp_monitor())
 
     if args.json_format:
-        print(json.dumps(result, indent=4))
+        pass
     else:
         # input_file_sizes is dynamic in length so exclude and then put it back
         first_data = copy.deepcopy(result[0])
@@ -627,7 +654,7 @@ def subcmd_gcp_monitor(caper_client, args):
                     if len(file_sizes) == 1:
                         row.append(key)
                     else:
-                        row.append(key + '[{idx}]'.format(idx=i))
+                        row.append(key + f'[{i}]')
                     row.append(str(file_size))
 
             writer.writerow(row)
@@ -637,9 +664,10 @@ def read_json(json_file):
     if json_file:
         json_contents = AutoURI(get_abspath(json_file)).read()
         return json.loads(json_contents)
+    return None
 
 
-def subcmd_gcp_res_analysis(caper_client, args):
+def subcmd_gcp_res_analysis(caper_client, args) -> None:
     """Solves linear regression problem to find coeffs and intercept
     to help optimizing resources for a task based on task's input file size.
 
@@ -652,29 +680,29 @@ def subcmd_gcp_res_analysis(caper_client, args):
     res_analysis = LinearResourceAnalysis()
     res_analysis.collect_resource_data(all_metadata)
 
-    result = res_analysis.analyze(
+    res_analysis.analyze(
         in_file_vars=read_json(args.in_file_vars_def_json),
         reduce_in_file_vars=getattr(
-            ResourceAnalysisReductionMethod, args.reduce_in_file_vars
+            ResourceAnalysisReductionMethod,
+            args.reduce_in_file_vars,
         ).value,
         target_resources=args.target_resources,
         plot_pdf=get_abspath(args.plot_pdf),
     )
-    print(json.dumps(result, indent=4))
 
 
-def subcmd_cleanup(caper_client, args):
+def subcmd_cleanup(caper_client, args) -> None:
     """Cleanup outputs of a workflow."""
     cm = get_single_cromwell_metadata_obj(caper_client, args, 'cleanup')
     cm.cleanup(dry_run=not args.delete, num_threads=args.num_threads, no_lock=True)
     if not args.delete:
         logger.warning(
             'Use --delete to DELETE ALL OUTPUTS of this workflow. '
-            'This action is NOT REVERSIBLE. Use this at your own risk.'
+            'This action is NOT REVERSIBLE. Use this at your own risk.',
         )
 
 
-def main(args=None, nonblocking_server=False):
+def main(args: list[str] | None = None, nonblocking_server: bool = False) -> None:
     """
     Args:
         args:
@@ -704,12 +732,13 @@ def main(args=None, nonblocking_server=False):
 
     if parsed_args.action == 'init':
         init_caper_conf(parsed_args.conf, parsed_args.platform)
-    elif parsed_args.action in ('hpc'):
+        return None
+    if parsed_args.action in ('hpc'):
         return subcmd_hpc(parsed_args)
-    elif parsed_args.action in ('run', 'server'):
+    if parsed_args.action in ('run', 'server'):
         return runner(parsed_args, nonblocking_server=nonblocking_server)
-    else:
-        client(parsed_args)
+    client(parsed_args)
+    return None
 
 
 if __name__ == '__main__':

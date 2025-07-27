@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
 import pwd
 import re
+from typing import Any
 
 from autouri import AutoURI
 
@@ -23,13 +26,13 @@ class CaperLabels:
 
     def create_file(
         self,
-        directory,
-        backend=None,
-        custom_labels=None,
-        str_label=None,
-        user=None,
-        basename=BASENAME_LABELS,
-    ):
+        directory: str,
+        backend: str | None = None,
+        custom_labels: str | None = None,
+        str_label: str | None = None,
+        user: str | None = None,
+        basename: str = BASENAME_LABELS,
+    ) -> str:
         """Create labels JSON file.
 
         Args:
@@ -46,7 +49,7 @@ class CaperLabels:
             basename:
                 Basename of labels file.
         """
-        template = {}
+        template: dict[str, Any] = {}
 
         if custom_labels:
             s = AutoURI(custom_labels).read()
@@ -57,14 +60,15 @@ class CaperLabels:
 
         if str_label:
             new_str_label = re.sub(
-                RE_ILLEGAL_STR_LABEL_CHRS, SUB_ILLEGAL_STR_LABEL_CHRS, str_label
+                RE_ILLEGAL_STR_LABEL_CHRS,
+                SUB_ILLEGAL_STR_LABEL_CHRS,
+                str_label,
             )
             if str_label != new_str_label:
                 logger.warning(
-                    'Found illegal characters in str_label matching with {regex}. '
-                    'Replaced with {sub}'.format(
-                        regex=RE_ILLEGAL_STR_LABEL_CHRS, sub=SUB_ILLEGAL_STR_LABEL_CHRS
-                    )
+                    'Found illegal characters in str_label matching with %s. Replaced with %s',
+                    RE_ILLEGAL_STR_LABEL_CHRS,
+                    SUB_ILLEGAL_STR_LABEL_CHRS,
                 )
             template[CaperLabels.KEY_CAPER_STR_LABEL] = new_str_label
 

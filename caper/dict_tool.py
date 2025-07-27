@@ -4,16 +4,18 @@ Author:
     Jin Lee (leepc12@gmail.com) at ENCODE-DCC
 """
 
+from __future__ import annotations
+
 import re
 from collections import defaultdict
-
-try:
-    from collections.abc import MutableMapping
-except AttributeError:
-    from collections import MutableMapping
+from collections.abc import MutableMapping
+from typing import Any, Callable
 
 
-def merge_dict(a, b):
+def merge_dict(
+    a: MutableMapping[str, Any],
+    b: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
     """Merges b into a recursively. This mutates a and overwrites
     items in b on a for conflicts.
 
@@ -33,7 +35,11 @@ def merge_dict(a, b):
     return a
 
 
-def flatten_dict(d, reducer=None, parent_key=()):
+def flatten_dict(
+    d: MutableMapping[str, Any],
+    reducer: str | None = None,
+    parent_key: tuple[str, ...] = (),
+) -> dict[str | tuple[str, ...], Any]:
     """Flattens dict into single-level-tuple-keyed dict with
         {(tuple of keys of parents and self): value}
 
@@ -54,14 +60,13 @@ def flatten_dict(d, reducer=None, parent_key=()):
         else:
             items.append((new_key, v))
     if reducer:
-        return {reducer.join(k): v for k, v in type(d)(items).items()}
-    else:
-        return type(d)(items)
+        return {reducer.join(k): v for k, v in (type(d)(items)).items()}
+    return type(d)(items)
 
 
-def recurse_dict_value(d, fnc):
+def recurse_dict_value(d: Any, fnc: Callable[[Any], None]) -> None:
     if isinstance(d, dict):
-        for k, v in d.items():
+        for v in d.values():
             recurse_dict_value(v, fnc)
 
     elif isinstance(d, (list, tuple)):
@@ -71,9 +76,9 @@ def recurse_dict_value(d, fnc):
         fnc(d)
 
 
-def unflatten_dict(d_flat):
+def unflatten_dict(d_flat: dict[tuple[str, ...], Any]) -> dict[str, Any]:
     """Unflattens single-level-tuple-keyed dict into dict"""
-    result = type(d_flat)()
+    result: dict[str, Any] = type(d_flat)()
     for k_tuple, v in d_flat.items():
         d_curr = result
         for i, k in enumerate(k_tuple):
@@ -85,7 +90,10 @@ def unflatten_dict(d_flat):
     return result
 
 
-def split_dict(d, rules=None):
+def split_dict(
+    d: dict[str, Any],
+    rules: tuple[str, str] | list[tuple[str, str]] | None = None,
+) -> list[dict[str, Any]]:
     """Splits dict according to "rule"
 
     Returns:
@@ -202,11 +210,16 @@ def split_dict(d, rules=None):
             d_others[k_tuple] = v
     if d_others:
         d_ = unflatten_dict(d_others)
-        result = [d_] + result
+        result = [d_, *result]
     return result
 
 
-def dict_to_dot_str(d, parent_key='digraph D', indent='', base_indent=''):
+def dict_to_dot_str(
+    d: str | dict[str, Any] | None,
+    parent_key: str = 'digraph D',
+    indent: str = '',
+    base_indent: str = '',
+) -> str:
     """Dict will be converted into DOT like the followings:
         1) Value string will not be double-quotted in DOT.
             - make sure to escape double-quotes in a string with special characters
@@ -272,19 +285,20 @@ def dict_to_dot_str(d, parent_key='digraph D', indent='', base_indent=''):
     """
     result = ''
     if d is None:
-        return '{}{};\n'.format(base_indent, parent_key)
-    elif isinstance(d, str):
-        return '{}{} = {};\n'.format(base_indent, parent_key, d)
-    elif isinstance(d, dict):
+        return f'{base_indent}{parent_key};\n'
+    if isinstance(d, str):
+        return f'{base_indent}{parent_key} = {d};\n'
+    if isinstance(d, dict):
         result += base_indent + parent_key + ' {\n'
         for k, v in d.items():
             result += dict_to_dot_str(
-                v, parent_key=k, indent=indent, base_indent=base_indent + indent
+                v,
+                parent_key=k,
+                indent=indent,
+                base_indent=base_indent + indent,
             )
         result += base_indent + '}\n'
     else:
-        raise ValueError(
-            'Unsupported data type: {} '
-            '(only str and dict/JSON are allowed).'.format(type(d))
-        )
+        msg = f'Unsupported data type: {type(d)} (only str and dict/JSON are allowed).'
+        raise TypeError(msg)
     return result

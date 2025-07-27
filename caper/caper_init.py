@@ -25,15 +25,15 @@ CONF_CONTENTS_COMMON_RESOURCE_PARAM_HELP = """
 # It is not recommended to change it unless your cluster has custom resource settings.
 # See https://github.com/ENCODE-DCC/caper/blob/master/docs/resource_param.md for details."""
 
-CONF_CONTENTS_SLURM_PARAM = ""
+CONF_CONTENTS_SLURM_PARAM = ''
 CONF_CONTENTS_SGE_PARAM = """
 # Parallel environment of SGE:
 # Find one with `$ qconf -spl` or ask you admin to add one if not exists.
 sge-pe=
 """
 
-CONF_CONTENTS_PBS_PARAM = ""
-CONF_CONTENTS_LSF_PARAM = ""
+CONF_CONTENTS_PBS_PARAM = ''
+CONF_CONTENTS_LSF_PARAM = ''
 
 DEFAULT_CONF_CONTENTS_LOCAL = (
     """backend=local
@@ -124,7 +124,7 @@ max-retries=1
 )
 
 
-def init_caper_conf(conf_file, backend):
+def init_caper_conf(conf_file: str, backend: str) -> None:
     """Initialize conf file for a given backend.
     There are two special backend aliases for two Stanford clusters.
     These clusters are based on SLURM.
@@ -146,7 +146,8 @@ def init_caper_conf(conf_file, backend):
     elif backend in BACKEND_AWS:
         contents = DEFAULT_CONF_CONTENTS_AWS
     else:
-        raise ValueError('Unsupported backend {p}'.format(p=backend))
+        msg = f'Unsupported backend {backend}'
+        raise ValueError(msg)
 
     conf_file = os.path.expanduser(conf_file)
     os.makedirs(os.path.dirname(conf_file), exist_ok=True)
@@ -156,6 +157,6 @@ def init_caper_conf(conf_file, backend):
 
         cromwell = Cromwell()
         fp.write(
-            '{key}={val}\n'.format(key='cromwell', val=cromwell.install_cromwell())
+            '{key}={val}\n'.format(key='cromwell', val=cromwell.install_cromwell()),
         )
         fp.write('{key}={val}\n'.format(key='womtool', val=cromwell.install_womtool()))

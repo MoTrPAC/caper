@@ -27,7 +27,7 @@ from .wdl_parser import WDLParser
 logger = logging.getLogger(__name__)
 
 
-class WomtoolValidationFailedException(Exception):
+class WomtoolValidationFailedException(Exception):  # noqa: N818
     pass
 
 
@@ -89,7 +89,7 @@ class CaperRunner(CaperBase):
         lsf_queue=None,
         lsf_extra_param=None,
         lsf_resource_param=CromwellBackendLsf.DEFAULT_LSF_RESOURCE_PARAM,
-    ):
+    ) -> None:
         """See docstring of base class for other arguments.
 
         Args:
@@ -127,7 +127,7 @@ class CaperRunner(CaperBase):
             gcp_compute_service_account:
                 Service account email to use for Google Cloud Batch compute instances.
                 If not provided, the default Compute Engine service account will be used.
-                Ensure that this service account has the `roles/batch.agentReporter` role, so that 
+                Ensure that this service account has the `roles/batch.agentReporter` role, so that
                 VM instances can report their status to Batch.
             gcp_region:
                 Region for Google Cloud Batch API.
@@ -245,7 +245,7 @@ class CaperRunner(CaperBase):
 
         self._caper_labels = CaperLabels()
 
-    def _set_env_gcp_prj(self, gcp_prj=None, env_name=ENV_GOOGLE_CLOUD_PROJECT):
+    def _set_env_gcp_prj(self, gcp_prj=None, env_name=ENV_GOOGLE_CLOUD_PROJECT) -> None:
         """Initalizes environment for authentication (storage).
         Args:
             gcp_prj:
@@ -257,11 +257,10 @@ class CaperRunner(CaperBase):
                 prj = os.environ[env_name]
                 if prj != gcp_prj:
                     logger.warning(
-                        'Env var {env} does not match with '
-                        'gcp_prj {prj}.'.format(env=env_name, prj=gcp_prj)
+                        f'Env var {env_name} does not match with gcp_prj {gcp_prj}.',
                     )
             logger.debug(
-                'Adding {prj} to env var {env}'.format(prj=gcp_prj, env=env_name)
+                f'Adding {gcp_prj} to env var {env_name}',
             )
             os.environ[env_name] = gcp_prj
 
@@ -392,21 +391,25 @@ class CaperRunner(CaperBase):
                 URI of metadata JSON file.
         """
         if not AutoURI(wdl).exists:
-            raise FileNotFoundError('WDL does not exists. {wdl}'.format(wdl=wdl))
+            msg = f'WDL does not exists. {wdl}'
+            raise FileNotFoundError(msg)
 
         if str_label is None and inputs:
             str_label = AutoURI(inputs).basename_wo_ext
 
         if work_dir is None:
             work_dir = self.create_timestamped_work_dir(
-                prefix=AutoURI(wdl).basename_wo_ext
+                prefix=AutoURI(wdl).basename_wo_ext,
             )
 
-        logger.info('Localizing files on work_dir. {d}'.format(d=work_dir))
+        logger.info(f'Localizing files on work_dir. {work_dir}')
 
         if inputs:
             maybe_remote_file = self.localize_on_backend_if_modified(
-                inputs, backend=backend, recursive=not no_deepcopy, make_md5_file=True
+                inputs,
+                backend=backend,
+                recursive=not no_deepcopy,
+                make_md5_file=True,
             )
             inputs = AutoURI(maybe_remote_file).localize_on(work_dir)
 
@@ -421,18 +424,20 @@ class CaperRunner(CaperBase):
 
         if metadata_output:
             if not AbsPath(metadata_output).is_valid:
+                msg = f'metadata_output is not a valid local abspath. {metadata_output}'
                 raise ValueError(
-                    'metadata_output is not a valid local abspath. {m}'.format(
-                        m=metadata_output
-                    )
+                    msg,
                 )
         else:
             metadata_output = os.path.join(
-                work_dir, CromwellMetadata.DEFAULT_METADATA_BASENAME
+                work_dir,
+                CromwellMetadata.DEFAULT_METADATA_BASENAME,
             )
 
         backend_conf = self._caper_backend_conf.create_file(
-            directory=work_dir, backend=backend, custom_backend_conf=custom_backend_conf
+            directory=work_dir,
+            backend=backend,
+            custom_backend_conf=custom_backend_conf,
         )
 
         options = self._caper_workflow_opts.create_file(
@@ -461,11 +466,9 @@ class CaperRunner(CaperBase):
             self._cromwell.validate(wdl=wdl, inputs=inputs, imports=imports)
 
         logger.info(
-            'launching run: wdl={w}, inputs={i}, backend_conf={b}'.format(
-                w=wdl, i=inputs, b=backend_conf
-            )
+            f'launching run: wdl={wdl}, inputs={inputs}, backend_conf={backend_conf}',
         )
-        th = self._cromwell.run(
+        return self._cromwell.run(
             wdl=wdl,
             backend_conf=backend_conf,
             inputs=inputs,
@@ -477,7 +480,6 @@ class CaperRunner(CaperBase):
             fileobj_troubleshoot=fileobj_troubleshoot,
             dry_run=dry_run,
         )
-        return th
 
     def server(
         self,
@@ -538,7 +540,7 @@ class CaperRunner(CaperBase):
         """
         if work_dir is None:
             work_dir = self.create_timestamped_work_dir(
-                prefix=CaperRunner.SERVER_TMP_DIR_PREFIX
+                prefix=CaperRunner.SERVER_TMP_DIR_PREFIX,
             )
 
         backend_conf = self._caper_backend_conf.create_file(
@@ -546,9 +548,9 @@ class CaperRunner(CaperBase):
             backend=default_backend,
             custom_backend_conf=custom_backend_conf,
         )
-        logger.info('launching server: backend_conf={b}'.format(b=backend_conf))
+        logger.info(f'launching server: backend_conf={backend_conf}')
 
-        th = self._cromwell.server(
+        return self._cromwell.server(
             backend_conf=backend_conf,
             server_port=server_port,
             server_hostname=server_hostname,
@@ -559,4 +561,3 @@ class CaperRunner(CaperBase):
             auto_write_metadata=auto_write_metadata,
             dry_run=dry_run,
         )
-        return th

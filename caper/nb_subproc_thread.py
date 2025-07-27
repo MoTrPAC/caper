@@ -1,21 +1,24 @@
+from __future__ import annotations
+
 import logging
 import signal
 import time
 from subprocess import PIPE, Popen
 from threading import Thread
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 interrupted = False
 terminated = False
 
 
-def sigterm_handler(signo, frame):
+def sigterm_handler(_signo: int, _frame: Any) -> None:
     global terminated
     logger.info('Received SIGTERM.')
     terminated = True
 
 
-def sigint_handler(signo, frame):
+def sigint_handler(_signo: int, _frame: Any) -> None:
     global interrupted
     logger.info('Received SIGINT.')
     interrupted = True
@@ -25,7 +28,7 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigint_handler)
 
 
-def is_fileobj_open(fileobj):
+def is_fileobj_open(fileobj: Any) -> bool:
     return fileobj and not getattr(fileobj, 'closed', False)
 
 
@@ -36,17 +39,17 @@ class NBSubprocThread(Thread):
 
     def __init__(
         self,
-        args,
-        cwd=None,
-        stdin=None,
-        on_poll=None,
-        on_stdout=None,
-        on_stderr=None,
-        on_finish=None,
-        poll_interval=DEFAULT_POLL_INTERVAL_SEC,
-        quiet=False,
-        subprocess_name=DEFAULT_SUBPROCESS_NAME,
-    ):
+        args: list[str],
+        cwd: str | None = None,
+        stdin: Any | None = None,
+        on_poll: Callable[[], Any] | None = None,
+        on_stdout: Callable[[str], Any] | None = None,
+        on_stderr: Callable[[str], Any] | None = None,
+        on_finish: Callable[[], Any] | None = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL_SEC,
+        quiet: bool = False,
+        subprocess_name: str = DEFAULT_SUBPROCESS_NAME,
+    ) -> None:
         """Non-blocking STDOUT/STDERR streaming for subprocess.Popen().
 
         This class makes two daemonized threads for nonblocking
@@ -109,39 +112,37 @@ class NBSubprocThread(Thread):
         self._quiet = quiet
         self._subprocess_name = subprocess_name
 
-        self._stdout_list = []
-        self._stderr_list = []
-        self._returncode = None
+        self._stdout_list: list[str] = []
+        self._stderr_list: list[str] = []
+        self._returncode: int | None = None
         self._stop_it = False
-        self._stop_signal = None
-        self._status = None
-        self._returnvalue = None
+        self._stop_signal: int | None = None
+        self._status: Any | None = None
+        self._returnvalue: Any | None = None
 
     @property
-    def stdout(self):
+    def stdout(self) -> str:
         return ''.join(self._stdout_list)
 
     @property
-    def stderr(self):
+    def stderr(self) -> str:
         return ''.join(self._stderr_list)
 
-    @property
-    def returncode(self):
+    def returncode(self) -> int | None:
         """Returns subprocess.Popen.returncode.
         None if not completed or any general Exception occurs.
         """
         return self._returncode
 
     @property
-    def status(self):
+    def status(self) -> Any | None:
         """Updated with return value of on_poll() for every polling.
         Also updated with return value of on_stdout() or on_stderr()
-        if their return values are not None.
         """
         return self._status
 
     @property
-    def returnvalue(self):
+    def returnvalue(self) -> Any | None:
         """Updated with return value of on_finish()
         which is called when a thread is terminated.
         None if thread is still running so that on_finish() has not been called yet.
@@ -149,7 +150,7 @@ class NBSubprocThread(Thread):
         """
         return self._returnvalue
 
-    def stop(self, stop_signal=DEFAULT_STOP_SIGNAL, wait=False):
+    def stop(self, stop_signal: int = DEFAULT_STOP_SIGNAL, wait: bool = False) -> None:
         """Subprocess will be teminated after next polling.
 
         Args:
@@ -160,11 +161,7 @@ class NBSubprocThread(Thread):
         self._stop_signal = stop_signal
         if wait:
             if self._returncode is None:
-                logger.info(
-                    '{name}: waiting for a graceful shutdown...'.format(
-                        name=self._subprocess_name
-                    )
-                )
+                logger.info('%s: waiting for a graceful shutdown...', self._subprocess_name)
             while True:
                 if self._returncode is not None:
                     return
@@ -172,19 +169,19 @@ class NBSubprocThread(Thread):
 
     def _popen(
         self,
-        args,
-        cwd=None,
-        stdin=None,
-        on_poll=None,
-        on_stdout=None,
-        on_stderr=None,
-        on_finish=None,
-    ):
+        args: list[str],
+        cwd: str | None = None,
+        stdin: Any | None = None,
+        on_poll: Callable[[], Any] | None = None,
+        on_stdout: Callable[[str], Any] | None = None,
+        on_stderr: Callable[[str], Any] | None = None,
+        on_finish: Callable[[], Any] | None = None,
+    ) -> None:
         """Wrapper for subprocess.Popen()."""
         global terminated
         global interrupted
 
-        def read_stdout(stdout_bytes):
+        def read_stdout(stdout_bytes: bytes) -> None:
             text = stdout_bytes.decode()
             if text:
                 self._stdout_list.append(text)
@@ -193,7 +190,7 @@ class NBSubprocThread(Thread):
                     if ret_on_stdout is not None:
                         self._status = ret_on_stdout
 
-        def read_stderr(stderr_bytes):
+        def read_stderr(stderr_bytes: bytes) -> None:
             text = stderr_bytes.decode()
             if text:
                 self._stderr_list.append(text)
@@ -202,12 +199,14 @@ class NBSubprocThread(Thread):
                     if ret_on_stderr is not None:
                         self._status = ret_on_stderr
 
-        def read_from_stdout_obj(stdout):
-            if is_fileobj_open(stdout):
-                for line in iter(stdout.readline, b''):
-                    read_stdout(line)
+        def read_from_stdout_obj(stdout: Any) -> None:
+            while True:
+                if terminated or interrupted:
+                    break
+                if not is_fileobj_open(stdout):
+                    break
 
-        def read_from_stderr_obj(stderr):
+        def read_from_stderr_obj(stderr: Any) -> None:
             if is_fileobj_open(stderr):
                 for line in iter(stderr.readline, b''):
                     read_stderr(line)
@@ -217,10 +216,14 @@ class NBSubprocThread(Thread):
         try:
             p = Popen(args, stdout=PIPE, stderr=PIPE, cwd=cwd, stdin=stdin)
             thread_stdout = Thread(
-                target=read_from_stdout_obj, args=(p.stdout,), daemon=True
+                target=read_from_stdout_obj,
+                args=(p.stdout,),
+                daemon=True,
             )
             thread_stderr = Thread(
-                target=read_from_stderr_obj, args=(p.stderr,), daemon=True
+                target=read_from_stderr_obj,
+                args=(p.stderr,),
+                daemon=True,
             )
             thread_stdout.start()
             thread_stderr.start()
@@ -234,28 +237,29 @@ class NBSubprocThread(Thread):
                     self._returncode = p.poll()
                     break
 
-                if terminated or interrupted or self._stop_it and self._stop_signal:
+                if terminated or interrupted or (self._stop_it and self._stop_signal):
                     if terminated:
-                        stop_signal = signal.SIGTERM
+                        current_signal = signal.SIGTERM
                     elif interrupted:
-                        stop_signal = signal.SIGINT
+                        current_signal = signal.SIGINT
                     else:
-                        stop_signal = self._stop_signal
+                        current_signal = self._stop_signal or signal.SIGTERM
 
                     logger.info(
-                        f'Sending signal {stop_signal} to subprocess. '
-                        f'name: {self._subprocess_name}, pid: {p.pid}'
+                        'Sending signal %s to subprocess. '
+                        'name: %s, pid: %s',
+                        current_signal, self._subprocess_name, p.pid,
                     )
-                    p.send_signal(stop_signal)
+                    p.send_signal(current_signal)
 
                     self._returncode = p.returncode
                     break
 
                 time.sleep(self._poll_interval)
 
-        except Exception as e:
+        except Exception:
             if not self._quiet:
-                logger.error(e, exc_info=True)
+                logger.exception("Error in subprocess")
             self._returncode = 127
 
         else:
@@ -272,11 +276,11 @@ class NBSubprocThread(Thread):
         if not self._quiet:
             if self._returncode:
                 logger.error(
-                    '{name} failed. returncode={rc}'.format(
-                        name=self._subprocess_name, rc=self._returncode
-                    )
+                    '%s failed. returncode=%s',
+                    self._subprocess_name, self._returncode,
                 )
             else:
                 logger.info(
-                    '{name} finished successfully.'.format(name=self._subprocess_name)
+                    '%s finished successfully.',
+                    self._subprocess_name,
                 )

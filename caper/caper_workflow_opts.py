@@ -42,11 +42,11 @@ class CaperWorkflowOpts:
         pbs_extra_param=None,
         lsf_queue=None,
         lsf_extra_param=None,
-    ):
+    ) -> None:
         """Template for a workflows options JSON file.
         All parameters are optional.
 
-        If parameters have been set at the backend-level, these workflow-level options will 
+        If parameters have been set at the backend-level, these workflow-level options will
         override them.
 
         Args:
@@ -93,7 +93,7 @@ class CaperWorkflowOpts:
                 Extra parameters for LSF.
                 This will be appended to "bsub" command line.
         """
-        self._template = {CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES: dict()}
+        self._template = {CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES: {}}
         default_runtime_attributes = self._template[
             CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES
         ]
@@ -101,7 +101,9 @@ class CaperWorkflowOpts:
         if gcp_zones:
             default_runtime_attributes['zones'] = ' '.join(gcp_zones)
         if gcp_compute_service_account:
-            default_runtime_attributes['google_compute_service_account'] = gcp_compute_service_account
+            default_runtime_attributes['google_compute_service_account'] = (
+                gcp_compute_service_account
+            )
 
         if slurm_partition:
             default_runtime_attributes['slurm_partition'] = slurm_partition
@@ -189,7 +191,8 @@ class CaperWorkflowOpts:
                 Basename for a temporary workflow options JSON file.
         """
         if singularity and docker:
-            raise ValueError('Cannot use both Singularity and Docker.')
+            msg = 'Cannot use both Singularity and Docker.'
+            raise ValueError(msg)
 
         template = copy.deepcopy(self._template)
         default_runtime_attributes = template[
@@ -204,9 +207,12 @@ class CaperWorkflowOpts:
         # sanity check for environment flags
         defined_env_flags = [env for env in (docker, singularity, conda) if env]
         if len(defined_env_flags) > 1:
-            raise ValueError(
+            msg = (
                 'docker, singularity and conda are mutually exclusive. '
                 'Define nothing or only one environment.'
+            )
+            raise ValueError(
+                msg,
             )
 
         if docker is not None:
@@ -221,19 +227,17 @@ class CaperWorkflowOpts:
         if environment:
             default_runtime_attributes['environment'] = environment
 
-        if docker == '' or backend in (BACKEND_GCP, BACKEND_AWS) and not docker:
+        if docker == '' or (backend in (BACKEND_GCP, BACKEND_AWS) and not docker):
             # if used as a flag or cloud backend is chosen
             # try to find "default_docker" from WDL's workflow.meta or "#CAPER docker" from comments
             docker = wdl_parser.default_docker
             if docker:
                 logger.info(
-                    'Docker image found in WDL metadata. wdl={wdl}, d={d}'.format(
-                        wdl=wdl, d=docker
-                    )
+                    f'Docker image found in WDL metadata. wdl={wdl}, d={docker}',
                 )
             else:
                 logger.info(
-                    "Docker image not found in WDL metadata. wdl={wdl}".format(wdl=wdl)
+                    f'Docker image not found in WDL metadata. wdl={wdl}',
                 )
 
         if docker:
@@ -242,49 +246,43 @@ class CaperWorkflowOpts:
         if singularity == '':
             # if used as a flag
             if backend in (BACKEND_GCP, BACKEND_AWS):
+                msg = 'Singularity cannot be used for cloud backend (e.g. aws, gcp).'
                 raise ValueError(
-                    'Singularity cannot be used for cloud backend (e.g. aws, gcp).'
+                    msg,
                 )
 
             singularity = wdl_parser.default_singularity
             if singularity:
                 logger.info(
-                    'Singularity image found in WDL metadata. wdl={wdl}, s={s}'.format(
-                        wdl=wdl, s=singularity
-                    )
+                    f'Singularity image found in WDL metadata. wdl={wdl}, s={singularity}',
                 )
             else:
                 logger.info(
-                    'Singularity image not found in WDL metadata. wdl={wdl}.'.format(
-                        wdl=wdl
-                    )
+                    f'Singularity image not found in WDL metadata. wdl={wdl}.',
                 )
 
         if singularity:
             default_runtime_attributes['singularity'] = singularity
             if inputs:
                 default_runtime_attributes['singularity_bindpath'] = find_bindpath(
-                    inputs
+                    inputs,
                 )
 
         if conda == '':
             # if used as a flag
             if backend in (BACKEND_GCP, BACKEND_AWS):
+                msg = 'Conda cannot be used for cloud backend (e.g. aws, gcp).'
                 raise ValueError(
-                    'Conda cannot be used for cloud backend (e.g. aws, gcp).'
+                    msg,
                 )
             conda = wdl_parser.default_conda
             if conda:
                 logger.info(
-                    'Conda environment name found in WDL metadata. wdl={wdl}, s={s}'.format(
-                        wdl=wdl, s=conda
-                    )
+                    f'Conda environment name found in WDL metadata. wdl={wdl}, s={conda}',
                 )
             else:
                 logger.info(
-                    'Conda environment name not found in WDL metadata. wdl={wdl}'.format(
-                        wdl=wdl
-                    )
+                    f'Conda environment name not found in WDL metadata. wdl={wdl}',
                 )
 
         if conda:
@@ -299,10 +297,11 @@ class CaperWorkflowOpts:
 
         if gcp_monitoring_script and backend == BACKEND_GCP:
             if not GCSURI(gcp_monitoring_script).is_valid:
+                msg = (
+                    f'gcp_monitoring_script is not a valid URI. {gcp_monitoring_script}'
+                )
                 raise ValueError(
-                    'gcp_monitoring_script is not a valid URI. {uri}'.format(
-                        uri=gcp_monitoring_script
-                    )
+                    msg,
                 )
             template['monitoring_script'] = gcp_monitoring_script
 

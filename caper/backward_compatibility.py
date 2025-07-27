@@ -1,7 +1,6 @@
-"""Variables and functions for backward_compatibililty
-"""
+"""Variables and functions for backward_compatibililty"""
 
-CAPER_1_0_0_PARAM_KEY_NAME_CHANGE = {
+CAPER_1_0_0_PARAM_KEY_NAME_CHANGE: dict[str, str] = {
     'out_dir': 'local_out_dir',
     'out_gcs_bucket': 'gcp_out_dir',
     'out_s3_bucket': 'aws_out_dir',
@@ -11,9 +10,11 @@ CAPER_1_0_0_PARAM_KEY_NAME_CHANGE = {
     'ip': 'hostname',
 }
 
-CAPER_1_4_2_PARAM_KEY_NAME_CHANGE = {'auto_update_metadata': 'auto_write_metadata'}
+CAPER_1_4_2_PARAM_KEY_NAME_CHANGE: dict[str, str] = {
+    'auto_update_metadata': 'auto_write_metadata',
+}
 
-PARAM_KEY_NAME_CHANGE = {
+PARAM_KEY_NAME_CHANGE: dict[str, str] = {
     **CAPER_1_0_0_PARAM_KEY_NAME_CHANGE,
     **CAPER_1_4_2_PARAM_KEY_NAME_CHANGE,
 }
