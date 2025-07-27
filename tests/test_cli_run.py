@@ -46,6 +46,7 @@ def test_mutually_exclusive_params(tmp_path, cmd):
         cli_main(cmd)
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_run(tmp_path, cromwell, womtool, debug_caper):
     """Will test most local parameters (run only) here."""
@@ -103,6 +104,7 @@ def test_run(tmp_path, cromwell, womtool, debug_caper):
     assert not os.path.exists(root_out_dir)
 
 
+@pytest.mark.slow
 @pytest.mark.google_cloud
 @pytest.mark.integration
 def test_run_gcp_batch_api(

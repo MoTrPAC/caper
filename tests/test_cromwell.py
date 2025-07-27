@@ -51,6 +51,7 @@ def test_validate(tmp_path, cromwell, womtool):
     c.validate(str(wdl), str(inputs), imports)
 
 
+@pytest.mark.slow
 def test_run(tmp_path, cromwell, womtool):
     fileobj_stdout = sys.stdout
 
@@ -114,6 +115,7 @@ def test_run(tmp_path, cromwell, womtool):
     assert th.returncode == 0
 
 
+@pytest.mark.slow
 def test_server(tmp_path, cromwell, womtool):
     """Test Cromwell.server() method, which returns a Thread object."""
     server_port = 8005

@@ -17,6 +17,7 @@ TIMEOUT_SERVER_SPIN_UP = 500
 TIMEOUT_SERVER_RUN_WORKFLOW = 960
 
 
+@pytest.mark.slow
 @pytest.mark.google_cloud
 @pytest.mark.integration
 def test_server_client(
