@@ -36,9 +36,11 @@ def install_file(f, install_dir, label):
 class Cromwell:
     """Wraps Cromwell/Womtool."""
 
-    DEFAULT_CROMWELL = 'https://github.com/broadinstitute/cromwell/releases/download/82/cromwell-82.jar'
+    DEFAULT_CROMWELL = (
+        'https://github.com/broadinstitute/cromwell/releases/download/90/cromwell-90.jar'
+    )
     DEFAULT_WOMTOOL = (
-        'https://github.com/broadinstitute/cromwell/releases/download/82/womtool-82.jar'
+        'https://github.com/broadinstitute/cromwell/releases/download/90/womtool-90.jar'
     )
     DEFAULT_CROMWELL_INSTALL_DIR = '~/.caper/cromwell_jar'
     DEFAULT_WOMTOOL_INSTALL_DIR = '~/.caper/womtool_jar'

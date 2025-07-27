@@ -56,7 +56,7 @@ class CromwellBackendCommon(UserDict):
         'services': {
             'LoadController': {
                 'class': 'cromwell.services.loadcontroller.impl'
-                '.LoadControllerServiceActor',
+                         '.LoadControllerServiceActor',
                 'config': {
                     # added due to issues on stanford sherlock/scg
                     'control-frequency': '21474834 seconds'
@@ -295,34 +295,29 @@ class CromwellBackendGcp(CromwellBackendBase):
     TEMPLATE_BACKEND = {
         'config': {
             'default-runtime-attributes': {},
-            'genomics-api-queries-per-100-seconds': 1000,
             'maximum-polling-interval': 600,
             'localization-attempts': 3,
-            'genomics': {
-                'restrict-metadata-access': False,
-                'compute-service-account': 'default',
-            },
+            'batch': {}
         }
     }
-    ACTOR_FACTORY_V2ALPHA = (
-        'cromwell.backend.google.pipelines.v2alpha1.PipelinesApiLifecycleActorFactory'
+
+    ACTOR_FACTORY_BATCH = (
+        'cromwell.backend.google.batch.GcpBatchBackendLifecycleActorFactory'
     )
-    ACTOR_FACTORY_V2BETA = (
-        'cromwell.backend.google.pipelines.v2beta.PipelinesApiLifecycleActorFactory'
-    )
-    GENOMICS_ENDPOINT_V2ALPHA = 'https://genomics.googleapis.com/'
-    GENOMICS_ENDPOINT_V2BETA = 'https://lifesciences.googleapis.com/'
     DEFAULT_REGION = 'us-central1'
     DEFAULT_CALL_CACHING_DUP_STRAT = CALL_CACHING_DUP_STRAT_REFERENCE
+
+    LOGGING_POLICY_GOOGLE_CLOUD_STORAGE = "PATH"
+    LOGGING_POLICY_GOOGLE_CLOUD_LOGGING = "LOGGING"
 
     def __init__(
         self,
         gcp_prj,
         gcp_out_dir,
         gcp_service_account_key_json=None,
-        use_google_cloud_life_sciences=False,
+        gcp_compute_service_account=None,
         gcp_region=DEFAULT_REGION,
-        gcp_zones=None,
+        gcp_logging_policy=LOGGING_POLICY_GOOGLE_CLOUD_STORAGE,
         max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
         call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
     ):
@@ -331,14 +326,13 @@ class CromwellBackendGcp(CromwellBackendBase):
             gcp_service_account_key_json:
                 Use this key JSON file to use service_account scheme
                 instead of application_default.
-            use_google_cloud_life_sciences:
-                Use Google Cloud Life Sciences API (v2beta) instead of
-                deprecated Genomics API (v2alpha1).
+            gcp_compute_service_account:
+                Set this to override the Batch compute service account. Otherwise,
+                defaults to the project's compute engine service account. Ensure that 
+                this service account has the `roles/batch.agentReporter` role, so that 
+                VM instances can report their status to Batch.
             gcp_region:
-                Region for Google Cloud Life Sciences API.
-            gcp_zones:
-                List of zones for Genomics API.
-                Ignored if use_google_cloud_life_sciences.
+                Region for Google Cloud Batch API.
         """
         if call_caching_dup_strat not in (
             CALL_CACHING_DUP_STRAT_REFERENCE,
@@ -360,11 +354,12 @@ class CromwellBackendGcp(CromwellBackendBase):
         self.merge_backend(CromwellBackendGcp.TEMPLATE_BACKEND)
 
         config = self.backend_config
-        genomics = config['genomics']
+        batch = config['batch']
         filesystems = config['filesystems']
 
+        batch['location'] = gcp_region
+        batch['logs-policy'] = gcp_logging_policy
         if gcp_service_account_key_json:
-            genomics['auth'] = 'service-account'
             filesystems[FILESYSTEM_GCS]['auth'] = 'service-account'
             self['google']['auths'] = [
                 {
@@ -373,13 +368,9 @@ class CromwellBackendGcp(CromwellBackendBase):
                     'json-file': gcp_service_account_key_json,
                 }
             ]
-            # parse service account key JSON to get client_email.
-            with open(gcp_service_account_key_json) as fp:
-                key_json = json.loads(fp.read())
-            genomics['compute-service-account'] = key_json['client_email']
             self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = 'service-account'
         else:
-            genomics['auth'] = 'application-default'
+            batch['auth'] = 'application-default'
             filesystems[FILESYSTEM_GCS]['auth'] = 'application-default'
             self['google']['auths'] = [
                 {'name': 'application-default', 'scheme': 'application_default'}
@@ -388,15 +379,11 @@ class CromwellBackendGcp(CromwellBackendBase):
                 'auth'
             ] = 'application-default'
 
-        if use_google_cloud_life_sciences:
-            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_V2BETA
-            genomics['endpoint-url'] = CromwellBackendGcp.GENOMICS_ENDPOINT_V2BETA
-            genomics['location'] = gcp_region
-        else:
-            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_V2ALPHA
-            genomics['endpoint-url'] = CromwellBackendGcp.GENOMICS_ENDPOINT_V2ALPHA
-            if gcp_zones:
-                self.default_runtime_attributes['zones'] = ' '.join(gcp_zones)
+        # If service account email is provided, use it for compute-service-account
+        if gcp_compute_service_account:
+            batch['compute-service-account'] = gcp_compute_service_account
+
+        self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
 
         config['project'] = gcp_prj
         self['engine']['filesystems'][FILESYSTEM_GCS]['project'] = gcp_prj

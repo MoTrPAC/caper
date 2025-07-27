@@ -68,7 +68,7 @@ class CaperRunner(CaperBase):
         gcp_out_dir=None,
         gcp_call_caching_dup_strat=CromwellBackendGcp.DEFAULT_CALL_CACHING_DUP_STRAT,
         gcp_service_account_key_json=None,
-        use_google_cloud_life_sciences=False,
+        gcp_compute_service_account=None,
         gcp_region=CromwellBackendGcp.DEFAULT_REGION,
         aws_batch_arn=None,
         aws_region=None,
@@ -124,12 +124,13 @@ class CaperRunner(CaperBase):
                 This will be added to environment variable
                 GOOGLE_APPLICATION_CREDENTIALS
                 If not match with existing key then error out.
-            use_google_cloud_life_sciences:
-                Use Google Cloud Life Sciences API instead of Genomics API
-                which has beed deprecated.
+            gcp_compute_service_account:
+                Service account email to use for Google Cloud Batch compute instances.
+                If not provided, the default Compute Engine service account will be used.
+                Ensure that this service account has the `roles/batch.agentReporter` role, so that 
+                VM instances can report their status to Batch.
             gcp_region:
-                Region for Google Cloud Life Sciences API.
-                Ignored if not use_google_cloud_life_sciences.
+                Region for Google Cloud Batch API.
             gcp_out_dir:
             aws_batch_arn:
             aws_region:
@@ -206,13 +207,12 @@ class CaperRunner(CaperBase):
             memory_retry_error_keys=memory_retry_error_keys,
             gcp_call_caching_dup_strat=gcp_call_caching_dup_strat,
             gcp_service_account_key_json=gcp_service_account_key_json,
-            use_google_cloud_life_sciences=use_google_cloud_life_sciences,
+            gcp_compute_service_account=gcp_compute_service_account,
             gcp_region=gcp_region,
             aws_batch_arn=aws_batch_arn,
             aws_region=aws_region,
             aws_out_dir=aws_out_dir,
             aws_call_caching_dup_strat=aws_call_caching_dup_strat,
-            gcp_zones=gcp_zones,
             slurm_partition=slurm_partition,
             slurm_account=slurm_account,
             slurm_extra_param=slurm_extra_param,
@@ -230,7 +230,6 @@ class CaperRunner(CaperBase):
         )
 
         self._caper_workflow_opts = CaperWorkflowOpts(
-            use_google_cloud_life_sciences=use_google_cloud_life_sciences,
             gcp_zones=gcp_zones,
             slurm_partition=slurm_partition,
             slurm_account=slurm_account,

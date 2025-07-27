@@ -111,21 +111,11 @@ gcp-out-dir=
 #   copy (not recommended): make a copy for a new workflow.
 gcp-call-caching-dup-strat=
 
-# Use Google Cloud Life Sciences API instead of Genomics API (deprecating).
-# Make sure to enable Google Cloud Life Sciences API on your Google Cloud Console
-use-google-cloud-life-sciences=true
-
-# gcp-region is required for Life Sciences API only.
 # Region is different from zone. Zone is more specific.
 # Do not define zone here. Check supported regions:
-#   https://cloud.google.com/life-sciences/docs/concepts/locations
+#   https://cloud.google.com/batch/docs/concepts/locations
 # e.g. us-central1
 gcp-region=
-
-# Comma-separated zones for Genomics API (deprecating).
-# This is ignored if use-google-cloud-life-sciences.
-# e.g. us-west1-a,us-west1-b,us-west1-c
-gcp-zones=
 
 # Number of retrials. This parameter also applies to non-OOM failures.
 max-retries=1

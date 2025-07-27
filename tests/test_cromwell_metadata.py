@@ -1,3 +1,4 @@
+import pytest
 import os
 import sys
 
@@ -9,6 +10,7 @@ from caper.cromwell_metadata import CromwellMetadata
 from .example_wdl import make_directory_with_failing_wdls, make_directory_with_wdls
 
 
+@pytest.mark.slow
 def test_on_successful_workflow(tmp_path, cromwell, womtool):
     fileobj_stdout = sys.stdout
 

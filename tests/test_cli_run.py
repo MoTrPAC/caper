@@ -46,6 +46,7 @@ def test_mutually_exclusive_params(tmp_path, cmd):
         cli_main(cmd)
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_run(tmp_path, cromwell, womtool, debug_caper):
     """Will test most local parameters (run only) here."""
@@ -103,9 +104,10 @@ def test_run(tmp_path, cromwell, womtool, debug_caper):
     assert not os.path.exists(root_out_dir)
 
 
+@pytest.mark.slow
 @pytest.mark.google_cloud
 @pytest.mark.integration
-def test_run_gcp_with_life_sciences_api(
+def test_run_gcp_batch_api(
     tmp_path,
     gcs_root,
     ci_prefix,
@@ -113,9 +115,10 @@ def test_run_gcp_with_life_sciences_api(
     womtool,
     gcp_prj,
     gcp_service_account_key_json,
+    gcp_compute_service_account,
     debug_caper,
 ):
-    """Test run with Google Cloud Life Sciences API"""
+    """Test run with Google Cloud Batch API"""
     out_gcs_bucket = os.path.join(gcs_root, 'caper_out', ci_prefix)
     tmp_gcs_bucket = os.path.join(gcs_root, 'caper_tmp')
 
@@ -130,7 +133,8 @@ def test_run_gcp_with_life_sciences_api(
     cmd += ['-m', str(metadata)]
     if gcp_service_account_key_json:
         cmd += ['--gcp-service-account-key-json', gcp_service_account_key_json]
-    cmd += ['--use-google-cloud-life-sciences']
+    if gcp_compute_service_account:
+        cmd += ['--gcp-compute-service-account', gcp_compute_service_account]
     cmd += ['--gcp-region', 'us-central1']
     # --gcp-zones should be ignored
     cmd += ['--gcp-zones', 'us-west1-a,us-west1-b']
