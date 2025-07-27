@@ -4,6 +4,8 @@ Deprecated. Please see [this](../scripts/gcp_caper_server/README.md) instead.
 
 # Configuration for Google Cloud Platform backend (`gcp`)
 
+> **NOTE**: Google Cloud Genomics API and Cloud Life Sciences API have been deprecated and removed. Caper now uses Google Cloud Batch API exclusively.
+
 1. Sign up for a Google account.
 2. Go to [Google Project](https://console.developers.google.com/project) page and click "SIGN UP FOR FREE TRIAL" on the top left and agree to terms.
 3. Set up a payment method and click "START MY FREE TRIAL".
@@ -45,11 +47,13 @@ On your Google Cloud Console, create a service account (`IAM & Admin` -> `Servic
 
 Create a secret key JSON file for your service account. Make sure that your service account has enough permission for provionsing VM instances and write permission on output/work Google Cloud Storage buckets (`--gcp-out-dir` and `--gcp-work-dir`).
 
-> **IMPORTANT**: Click on the created service account and make sure that `Enable G Suite Domain-wide Delegation` is checked to prevent the following permission error.
+> **IMPORTANT**: Click on the created service account and make sure that `Enable G Suite Domain-wide Delegation` is checked to prevent permission errors.
+
+> **NOTE**: The service account specified above is used to launch Batch jobs. This is different from the Compute Service Account used by the Google Cloud Batch VMs to run the actual tasks. You can specify a different Compute Service Account using the `--gcp-compute-service-account` parameter. The Compute Service Account needs the `roles/batch.agentReporter` role to report status back to Batch.
 
 ```
 400 Bad Request
-POST https://lifesciences.googleapis.com/v2beta/projects/99884963860/locations/us-central1/operations/XXXXXXXXXXXXXXXXXXXX:cancel
+POST https://batch.googleapis.com/v1/projects/99884963860/locations/us-central1/operations/XXXXXXXXXXXXXXXXXXXX:cancel
 {
   "code" : 400,
   "errors" : [ {
