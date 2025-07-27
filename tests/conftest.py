@@ -85,4 +85,4 @@ def debug_caper(request):
 
 @pytest.fixture(scope='session')
 def gcp_res_analysis_metadata(gcs_root):
-    return ' gs://omicspipelines-test-caper/resource_analysis/metadata.json'
+    return 'gs://omicspipelines-test-caper/resource_analysis/metadata.json'
