@@ -68,6 +68,7 @@ def test_on_successful_workflow(tmp_path, cromwell, womtool):
     assert CromwellMetadata(m_file_on_root).metadata == cm.metadata
 
 
+@pytest.mark.slow
 def test_on_failed_workflow(tmp_path, cromwell, womtool):
     fileobj_stdout = sys.stdout
 
