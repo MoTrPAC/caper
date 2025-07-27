@@ -4,14 +4,16 @@ dynamic = ["version"]
 description = "Cromwell Assisted Pipeline ExecutoR"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Jin Lee", email = "leepc12@gmail.com" }
+]
+maintainers = [
+    { name = "Mihir Samdarshi", email = "msamdars@stanford.edu"}
 ]
 keywords = ["cromwell", "pipeline", "workflow", "bioinformatics"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
@@ -33,7 +35,7 @@ Homepage = "https://github.com/MoTrPAC/caper"
 Repository = "https://github.com/MoTrPAC/caper"
 
 [project.scripts]
-caper = "caper.__main__:main"
+caper = "caper.cli:main"
 
 [build-system]
 requires = ["setuptools>=45", "wheel"]
@@ -51,4 +53,17 @@ version = { attr = "caper.__version__" }
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
+    "ruff"
 ]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests"]
+markers = [
+    "integration: Integration tests",
+    "google_cloud: Tests using Google Cloud services (require auth)",
+    "slow: mark test as slow"
+]
+
+[tool.ruff]
+
