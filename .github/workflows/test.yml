@@ -1,15 +1,19 @@
-name: Pytest
+name: Test
 
 on:
   push:
     branches:
       - master
+      - dev
   pull_request:
     branches:
       - master
+      - dev
 
 jobs:
   pytest:
+    name: Test (all)
+    if: github.ref == 'refs/heads/master' || (github.event_name == 'pull_request' && github.base_ref == 'master')
     runs-on: linux-self-hosted
 
     permissions:
@@ -56,7 +60,6 @@ jobs:
             uv-cache
 
       - name: Setup a venv
-        working-directory: server
         run: |
           uv venv
           # write venv path to GITHUB_ENV
@@ -64,27 +67,75 @@ jobs:
           echo "$(pwd)/.venv/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
-        working-directory: server
         run: uv sync --all-groups --all-extras
 
       - name: Run pytest
         env:
           GCS_ROOT: ${{ secrets.GCS_ROOT }}
           GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
+          COMPUTE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_COMPUTE_SERVICE_ACCOUNT }}
         run: |
-          cd tests/
-          
-          # run pytest
-          pytest --ci-prefix ${{ github.run_id }} \
+          uv run pytest --ci-prefix ${{ github.run_id }} \
                  --gcs-root ${GCS_ROOT} \
                  --gcp-prj ${GOOGLE_PROJECT_ID} \
+                 --gcp-compute-service-account ${COMPUTE_SERVICE_ACCOUNT} \
                  --debug-caper \
                  -vv -s
-          
-          # auth for gsutil
-          export GOOGLE_CLOUD_PROJECT=${GOOGLE_PROJECT_ID}
-          export BOTO_CONFIG=/dev/null
-          
-          # clean up
-          rm -f tmp_key.json
+
+      # Always clean up
+      - name: Clean up
+        if: always()
+        run: |
           gsutil -m rm -rf ${GCS_ROOT}/caper_out/${{ github.run_id }} || true
+
+  pytest-dev:
+    name: Test (w/o integration or Google Cloud tests)
+    if: github.ref == 'refs/heads/dev' || (github.event_name == 'pull_request' && github.base_ref == 'dev')
+    runs-on: linux-self-hosted
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv on Linux or macOS
+        run: curl -sSfL https://astral.sh/uv/install.sh | bash
+
+      - name: Find uv cache and compute cache suffix
+        run: |
+          {
+            echo "UV_CACHE=$(uv cache dir)"
+            echo "HASH_CACHE_SUFFIX=-${{ hashFiles('pyproject.toml') }}"
+          } >> $GITHUB_ENV
+
+      - name: Load uv cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE }}
+          key: |
+            uv-cache-${{ env.HASH_CACHE_SUFFIX }}
+            uv-cache
+
+      - name: Setup a venv
+        run: |
+          uv venv
+          # write venv path to GITHUB_ENV
+          echo "VIRTUAL_ENV=$(pwd)/.venv" >> $GITHUB_ENV
+          echo "$(pwd)/.venv/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: uv sync --all-groups --all-extras
+
+      - name: Run pytest
+        run: |
+          uv run pytest -m "not integration and not google_cloud and not slow" \
+                 --debug-caper \
+                 -vv -s
