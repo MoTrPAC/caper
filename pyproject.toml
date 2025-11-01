@@ -3,7 +3,7 @@ name = "caper"
 dynamic = ["version"]
 description = "Cromwell Assisted Pipeline ExecutoR"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Jin Lee", email = "leepc12@gmail.com" }
