@@ -112,3 +112,5 @@ src/test_caper_uri/
 cromwell.out
 dev/
 tests/hpc/
+
+*.code-workspace
