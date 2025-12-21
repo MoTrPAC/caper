@@ -360,6 +360,7 @@ class CromwellBackendGcp(CromwellBackendBase):
         batch['location'] = gcp_region
         batch['logs-policy'] = gcp_logging_policy
         if gcp_service_account_key_json:
+            batch['auth'] = 'service-account'
             filesystems[FILESYSTEM_GCS]['auth'] = 'service-account'
             self['google']['auths'] = [
                 {
