@@ -143,15 +143,6 @@ def get_parser_and_defaults(conf_file=None):
     # run, server
     parent_runner = argparse.ArgumentParser(add_help=False)
 
-    parent_runner = parent_runner.add_argument_group(title='Cromwell logging arguments')
-    parent_runner.add_argument(
-        '--cromwell-stdout',
-        default=DEFAULT_CROMWELL_STDOUT,
-        help='Local file to write STDOUT of Cromwell Java process to. '
-        'This is for Cromwell (not for Caper\'s logging system). '
-        'If this file already exists then Caper will make a new file suffixed with '
-        'incremented index. e.g. cromwell.out.1 ',
-    )
     group_db = parent_runner.add_argument_group(
         title='General DB settings (for both file DB and MySQL DB)'
     )
@@ -295,6 +286,14 @@ def get_parser_and_defaults(conf_file=None):
         'For local backends (local/slurm/sge/pbs/lsf) only. '
         'file: use md5sum hash (slow), path: use path only, '
         'path+modtime (default): use path + mtime.',
+    )
+    group_cromwell.add_argument(
+        "--cromwell-stdout",
+        default=DEFAULT_CROMWELL_STDOUT,
+        help="Local file to write STDOUT of Cromwell Java process to. "
+        "This is for Cromwell (not for Caper's logging system). "
+        "If this file already exists then Caper will make a new file suffixed with "
+        "incremented index. e.g. cromwell.out.1 ",
     )
 
     group_local = parent_runner.add_argument_group(title='local backend arguments')
