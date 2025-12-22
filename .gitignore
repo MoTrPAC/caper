@@ -114,3 +114,5 @@ dev/
 tests/hpc/
 
 *.code-workspace
+.vscode/
+.idea/
