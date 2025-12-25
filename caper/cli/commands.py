@@ -1,64 +1,19 @@
-"""Command registry for Caper CLI."""
+"""Command registry for Caper CLI.
+
+This module defines the COMMANDS list, which is the single source of truth for
+all available Caper commands. Each Command instance knows:
+- Its name and aliases
+- How to build its parser
+- What typed dataclass to use
+- What handler function to call
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-import argparse
-
-if TYPE_CHECKING:
-    from .args import (
-        AbortArgs,
-        CleanupArgs,
-        GcpMonitorArgs,
-        GcpResAnalysisArgs,
-        HpcAbortArgs,
-        HpcListArgs,
-        HpcSubmitArgs,
-        InitArgs,
-        ListArgs,
-        MetadataArgs,
-        RunArgs,
-        ServerArgs,
-        SubmitArgs,
-        TroubleshootArgs,
-        UnholdArgs,
-    )
-
-T = TypeVar("T")
-
-
-@dataclass
-class CommandSpec(Generic[T]):
-    """
-    Specification for a CLI subcommand.
-
-    Attributes:
-        name: Primary command name
-        aliases: Alternative names for the command
-        help: Help text shown in --help
-        build: Function to build the argparse subparser
-        model_cls: Dataclass type for parsed arguments
-        handler: Function to handle the command
-    """
-
-    name: str
-    aliases: tuple[str, ...]
-    help: str
-    build: Callable[[argparse._SubParsersAction], argparse.ArgumentParser]
-    model_cls: type[T]
-    handler: Callable[[T], None]
-
-    def to_model(self, ns: argparse.Namespace) -> T:
-        """Convert Namespace to typed dataclass."""
-        from .args.base import namespace_to_dataclass
-
-        return namespace_to_dataclass(ns, self.model_cls)
-
-
-# Import dataclasses
-from .args import (
+from caper.cli.args import (
     AbortArgs,
     CleanupArgs,
     GcpMonitorArgs,
@@ -75,26 +30,7 @@ from .args import (
     TroubleshootArgs,
     UnholdArgs,
 )
-
-# Import parser builders
-from .parsers import (
-    build_abort,
-    build_cleanup,
-    build_gcp_monitor,
-    build_gcp_res_analysis,
-    build_hpc,
-    build_init,
-    build_list,
-    build_metadata,
-    build_run,
-    build_server,
-    build_submit,
-    build_troubleshoot,
-    build_unhold,
-)
-
-# Import handlers
-from .handlers import (
+from caper.cli.handlers import (
     handle_abort,
     handle_cleanup,
     handle_gcp_monitor,
@@ -111,142 +47,153 @@ from .handlers import (
     handle_troubleshoot,
     handle_unhold,
 )
+from caper.cli.parsers import (
+    build_abort,
+    build_cleanup,
+    build_gcp_monitor,
+    build_gcp_res_analysis,
+    build_init,
+    build_list,
+    build_metadata,
+    build_run,
+    build_server,
+    build_submit,
+    build_troubleshoot,
+    build_unhold,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+T = TypeVar('T')
 
 
-# The command registry
-COMMANDS: tuple[CommandSpec[Any], ...] = (
-    CommandSpec(
+@dataclass
+class Command:
+    """
+    Definition of a Caper CLI command.
+
+    Attributes:
+        name: Primary command name
+        aliases: Alternative names (e.g., "ls" for "list")
+        help: Brief help text
+        build_parser: Function to build argparse parser
+        args_class: Typed dataclass for arguments
+        handler: Function that accepts typed args and executes command
+    """
+
+    name: str
+    aliases: tuple[str, ...]
+    help: str
+    build_parser: Callable[[Any], Any]
+    args_class: type
+    handler: Callable[[Any], None]
+
+# Command registry - single source of truth for all commands
+
+COMMANDS: list[Command] = [
+    Command(
         name='init',
         aliases=(),
         help="Initialize Caper's configuration file",
-        build=build_init,
-        model_cls=InitArgs,
+        build_parser=build_init,
+        args_class=InitArgs,
         handler=handle_init,
     ),
-    CommandSpec(
+    Command(
         name='run',
         aliases=('local', 'exec'),
         help='Run a single workflow without server',
-        build=build_run,
-        model_cls=RunArgs,
+        build_parser=build_run,
+        args_class=RunArgs,
         handler=handle_run,
     ),
-    CommandSpec(
+    Command(
         name='server',
         aliases=('srv',),
         help='Run a Cromwell server',
-        build=build_server,
-        model_cls=ServerArgs,
+        build_parser=build_server,
+        args_class=ServerArgs,
         handler=handle_server,
     ),
-    CommandSpec(
+    Command(
         name='submit',
         aliases=('sub',),
         help='Submit a workflow to a Cromwell server',
-        build=build_submit,
-        model_cls=SubmitArgs,
+        build_parser=build_submit,
+        args_class=SubmitArgs,
         handler=handle_submit,
     ),
-    CommandSpec(
+    Command(
         name='abort',
         aliases=(),
         help='Abort running/pending workflows on a Cromwell server',
-        build=build_abort,
-        model_cls=AbortArgs,
+        build_parser=build_abort,
+        args_class=AbortArgs,
         handler=handle_abort,
     ),
-    CommandSpec(
+    Command(
         name='unhold',
         aliases=(),
         help='Release hold of workflows on a Cromwell server',
-        build=build_unhold,
-        model_cls=UnholdArgs,
+        build_parser=build_unhold,
+        args_class=UnholdArgs,
         handler=handle_unhold,
     ),
-    CommandSpec(
+    Command(
         name='list',
         aliases=('ls',),
         help='List running/pending workflows on a Cromwell server',
-        build=build_list,
-        model_cls=ListArgs,
+        build_parser=build_list,
+        args_class=ListArgs,
         handler=handle_list,
     ),
-    CommandSpec(
+    Command(
         name='metadata',
         aliases=('meta', 'md'),
         help='Retrieve metadata JSON for workflows from a Cromwell server',
-        build=build_metadata,
-        model_cls=MetadataArgs,
+        build_parser=build_metadata,
+        args_class=MetadataArgs,
         handler=handle_metadata,
     ),
-    CommandSpec(
+    Command(
         name='troubleshoot',
         aliases=('debug', 'ts'),
-        help='Troubleshoot workflow problems from metadata JSON file or workflow IDs',
-        build=build_troubleshoot,
-        model_cls=TroubleshootArgs,
+        help='Troubleshoot workflow problems',
+        build_parser=build_troubleshoot,
+        args_class=TroubleshootArgs,
         handler=handle_troubleshoot,
     ),
-    CommandSpec(
+    Command(
         name='gcp_monitor',
         aliases=('monitor',),
         help="Tabulate task's resource data collected on GCP instances",
-        build=build_gcp_monitor,
-        model_cls=GcpMonitorArgs,
+        build_parser=build_gcp_monitor,
+        args_class=GcpMonitorArgs,
         handler=handle_gcp_monitor,
     ),
-    CommandSpec(
+    Command(
         name='gcp_res_analysis',
         aliases=('gcp_res', 'res'),
         help='Linear resource analysis on GCP monitoring data',
-        build=build_gcp_res_analysis,
-        model_cls=GcpResAnalysisArgs,
+        build_parser=build_gcp_res_analysis,
+        args_class=GcpResAnalysisArgs,
         handler=handle_gcp_res_analysis,
     ),
-    CommandSpec(
+    Command(
         name='cleanup',
         aliases=('clean',),
         help='Cleanup outputs of workflows',
-        build=build_cleanup,
-        model_cls=CleanupArgs,
+        build_parser=build_cleanup,
+        args_class=CleanupArgs,
         handler=handle_cleanup,
     ),
-    # HPC is special - nested subparser
-    CommandSpec(
-        name='hpc',
-        aliases=('cluster',),
-        help='HPC helper commands',
-        build=build_hpc,
-        model_cls=HpcSubmitArgs,  # Placeholder, actual is per hpc_action
-        handler=lambda x: None,  # Dispatch handled specially in dispatch.py
-    ),
-)
+]
 
-# Map for HPC subcommands
-HPC_COMMANDS: dict[str, CommandSpec[Any]] = {
-    'submit': CommandSpec(
-        name='submit',
-        aliases=('sbatch', 'qsub', 'bsub'),
-        help='Submit a single workflow to HPC',
-        build=lambda _: argparse.ArgumentParser(),  # Built inside build_hpc, dummy return
-        model_cls=HpcSubmitArgs,
-        handler=handle_hpc_submit,
-    ),
-    'list': CommandSpec(
-        name='list',
-        aliases=('ls',),
-        help='List all workflows submitted to HPC',
-        build=lambda _: argparse.ArgumentParser(),  # Built inside build_hpc, dummy return
-        model_cls=HpcListArgs,
-        handler=handle_hpc_list,
-    ),
-    'abort': CommandSpec(
-        name='abort',
-        aliases=('cancel',),
-        help='Abort a workflow submitted to HPC',
-        build=lambda _: argparse.ArgumentParser(),  # Built inside build_hpc, dummy return
-        model_cls=HpcAbortArgs,
-        handler=handle_hpc_abort,
-    ),
+# HPC commands are special - they're nested under "hpc" parent
+# We handle these separately in dispatch
+HPC_COMMANDS: dict[str, tuple[type, Callable]] = {
+    'submit': (HpcSubmitArgs, handle_hpc_submit),
+    'list': (HpcListArgs, handle_hpc_list),
+    'abort': (HpcAbortArgs, handle_hpc_abort),
 }
-

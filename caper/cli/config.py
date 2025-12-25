@@ -1,73 +1,107 @@
-"""Configuration loading for Caper CLI."""
+"""Configuration file loading and default merging for Caper CLI."""
 
 from __future__ import annotations
 
+import argparse
 import os
-import tempfile
-from argparse import ArgumentParser
-
-from caper.arg_tool import update_parsers_defaults_with_conf
-from caper.backward_compatibility import PARAM_KEY_NAME_CHANGE
+from configparser import ConfigParser, MissingSectionHeaderError
+from typing import Any
 
 
-def load_conf_defaults(conf_file: str) -> dict[str, str | bool | int | float | None]:
+def load_conf_defaults(conf_file: str) -> dict[str, Any]:
     """
-    Load configuration defaults from file.
+    Load config file as flat dict of string values.
 
-    Returns a flat dict of key-value pairs. Values are strings;
-    type conversion happens when projecting to dataclasses.
+    Args:
+        conf_file: Path to config file
+
+    Returns:
+        Dictionary of config keys to string values (with hyphens converted to underscores)
     """
     conf_file = os.path.expanduser(conf_file)
     if not os.path.exists(conf_file):
         return {}
 
-    # Use the existing read_from_conf function
-    from caper.arg_tool import read_from_conf
+    config = ConfigParser()
 
-    return read_from_conf(conf_file, conf_key_map=PARAM_KEY_NAME_CHANGE)
+    # Read config file, adding [defaults] section if missing
+    with open(conf_file) as fp:
+        content = fp.read()
+        try:
+            config.read_string(content)
+        except MissingSectionHeaderError:
+            # Add default section header if missing
+            config.read_string(f'[defaults]\n{content}')
+
+    # Extract all values from defaults section
+    result: dict[str, str] = {}
+    if config.has_section('defaults'):
+        for key, value in config.items('defaults'):
+            # Convert hyphens to underscores (argparse dest names use underscores)
+            normalized_key = key.replace('-', '_')
+            # Strip quotes from values
+            result[normalized_key] = value.strip('"\'')
+
+    return result
 
 
-def apply_conf_defaults_to_parsers(
-    parsers: list[ArgumentParser],
-    conf_defaults: dict[str, str | bool | int | float | None],
-) -> None:
+def apply_config_to_parser(parser: argparse.ArgumentParser, config: dict[str, Any]) -> None:
     """
-    Apply configuration defaults to all subparsers.
+    Apply config defaults to parser, with type conversion.
 
-    Uses the existing update_parsers_defaults_with_conf function
-    which handles type conversion based on parser defaults.
+    This function introspects the parser's actions to determine the correct type
+    for each config value, then applies them as defaults.
+
+    Args:
+        parser: argparse parser to apply defaults to
+        config: Dictionary of config keys to string values
     """
-    if not conf_defaults:
+    if not config:
         return
 
-    # We need to write conf_defaults to a temporary file to use
-    # update_parsers_defaults_with_conf, or we can implement the logic directly.
-    # For simplicity, let's write to a temp file and use the existing function.
-    # But actually, we can just use update_parsers_defaults_with_conf directly
-    # if we have the conf_file path. Let me check the flow...
+    # Build type map from parser actions
+    type_map: dict[str, Any] = {}
 
-    # Actually, since we already have conf_defaults as a dict, we can
-    # use update_parsers_defaults_with_conf by creating a temp config file
-    # or we can replicate its logic. Let's use a temp file approach for now.
+    for action in parser._actions:  # noqa: SLF001
+        if action.dest not in config:
+            continue
 
-    # Write defaults to a temporary config file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.conf') as tmp:
-        tmp.write('[defaults]\n')
-        for key, value in conf_defaults.items():
-            if value is not None:
-                # Convert key back to hyphenated form for config file
-                config_key = key.replace('_', '-')
-                tmp.write(f'{config_key}={value}\n')
-        tmp_path = tmp.name
+        # Skip special actions
+        if action.dest in ('help', 'version'):
+            continue
 
-    try:
-        # Use existing function to apply defaults with proper type conversion
-        update_parsers_defaults_with_conf(
-            parsers=parsers,
-            conf_file=tmp_path,
-            conf_key_map=PARAM_KEY_NAME_CHANGE,
-        )
-    finally:
-        # Clean up temp file
-        os.unlink(tmp_path)
+        # If action has explicit type, use it
+        if action.type:
+            type_map[action.dest] = action.type
+        # For store_true/store_false, convert to bool
+        elif isinstance(action, (argparse._StoreTrueAction, argparse._StoreFalseAction)):  # noqa: SLF001
+            type_map[action.dest] = _str_to_bool
+        # Infer from default value type
+        elif action.default is not None:
+            default_type = type(action.default)
+            if default_type in (bool, int, float, str):
+                if default_type is bool:
+                    type_map[action.dest] = _str_to_bool
+                else:
+                    type_map[action.dest] = default_type
 
+    # Convert config values and apply
+    converted: dict[str, Any] = {}
+    for key, value in config.items():
+        if key in type_map:
+            try:
+                converted[key] = type_map[key](value)
+            except (ValueError, TypeError):
+                # If conversion fails, use default value
+                converted[key] = value
+        else:
+            # No type info, use default value
+            converted[key] = value
+
+    # Apply to parser defaults
+    parser.set_defaults(**converted)
+
+
+def _str_to_bool(value: str) -> bool:
+    """Convert string to boolean for config file values."""
+    return value.lower() in ('true', 'yes', '1', 'on')

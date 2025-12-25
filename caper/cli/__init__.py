@@ -1,5 +1,5 @@
-"""Caper CLI module."""
+"""Caper CLI module with typed argument parsing."""
 
-from .dispatch import main
+from caper.cli.dispatch import main
 
 __all__ = ['main']

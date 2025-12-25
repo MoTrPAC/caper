@@ -10,21 +10,19 @@ import os
 import sys
 from typing import TYPE_CHECKING, Any
 
-from autouri import AutoURI, GCSURI
+from autouri import AutoURI
 
 from caper.caper_args import ResourceAnalysisReductionMethod
 from caper.caper_client import CaperClient, CaperClientSubmit
 from caper.caper_init import init_caper_conf
 from caper.caper_labels import CaperLabels
 from caper.caper_runner import CaperRunner
-from caper.cromwell_backend import CromwellBackendDatabase
+from caper.cli.arg_field import abspath as get_abspath
 from caper.cromwell_metadata import CromwellMetadata
 from caper.dict_tool import flatten_dict
 from caper.hpc import LsfWrapper, PbsWrapper, SgeWrapper, SlurmWrapper
 from caper.resource_analysis import LinearResourceAnalysis
 from caper.server_heartbeat import ServerHeartbeat
-
-from .args.base import get_abspath
 
 if TYPE_CHECKING:
     from .args import (
@@ -126,7 +124,7 @@ def handle_run(args: RunArgs) -> None:
     )
 
     cromwell_stdout = check_local_file_and_rename_if_exists(args.cromwell_stdout)
-    logger.info(f'Cromwell stdout: {cromwell_stdout}')
+    logger.info('Cromwell stdout: %s', cromwell_stdout)
 
     with open(cromwell_stdout, 'w') as f:
         try:
@@ -158,10 +156,10 @@ def handle_run(args: RunArgs) -> None:
                 thread.join()
                 thread.stop(wait=True)
                 if thread.returncode:
-                    logger.error(f'Check stdout in {cromwell_stdout}')
+                    logger.error('Check stdout in %s', cromwell_stdout)
 
         except KeyboardInterrupt:
-            logger.error(USER_INTERRUPT_WARNING, exc_info=True)
+            logger.exception(USER_INTERRUPT_WARNING)
 
 
 def handle_server(args: ServerArgs, nonblocking: bool = False) -> None:
@@ -235,10 +233,11 @@ def handle_server(args: ServerArgs, nonblocking: bool = False) -> None:
     }
 
     if nonblocking:
-        return c.server(fileobj_stdout=sys.stdout, **args_from_cli)
+        c.server(fileobj_stdout=sys.stdout, **args_from_cli)
+        return
 
     cromwell_stdout = check_local_file_and_rename_if_exists(args.cromwell_stdout)
-    logger.info(f'Cromwell stdout: {cromwell_stdout}')
+    logger.info('Cromwell stdout: %s', cromwell_stdout)
 
     with open(cromwell_stdout, 'w') as f:
         try:
@@ -247,10 +246,10 @@ def handle_server(args: ServerArgs, nonblocking: bool = False) -> None:
                 thread.join()
                 thread.stop(wait=True)
                 if thread.returncode:
-                    logger.error(f'Check stdout in {cromwell_stdout}')
+                    logger.error('Check stdout in %s', cromwell_stdout)
 
         except KeyboardInterrupt:
-            logger.error(USER_INTERRUPT_WARNING, exc_info=True)
+            logger.exception(USER_INTERRUPT_WARNING)
 
 
 def handle_submit(args: SubmitArgs) -> None:
@@ -348,7 +347,7 @@ def handle_unhold(args: UnholdArgs) -> None:
     c.unhold(args.wf_id_or_label)
 
 
-def handle_list(args: ListArgs) -> None:
+def handle_list(args: ListArgs) -> None:  # noqa: C901, PLR0912
     """Handle 'caper list' command."""
     sh = None
     if not args.no_server_heartbeat:
@@ -381,9 +380,12 @@ def handle_list(args: ListArgs) -> None:
             workflow_id = w.get('id')
             parent_workflow_id = w.get('parentWorkflowId')
 
-            if args.hide_result_before is not None:
-                if w.get('submission') and w.get('submission') <= args.hide_result_before:
-                    continue
+            if (
+                args.hide_result_before is not None
+                and w.get('submission')
+                and w.get('submission') <= args.hide_result_before
+            ):
+                continue
             for f in formats:
                 if f == 'workflow_id':
                     row.append(str(workflow_id))
@@ -429,7 +431,8 @@ def handle_metadata(args: MetadataArgs) -> None:
     )
     m = c.metadata(wf_ids_or_labels=args.wf_id_or_label, embed_subworkflow=True)
     if not m:
-        raise ValueError('Found no workflow matching with search query.')
+        msg = 'Found no workflow matching with search query.'
+        raise ValueError(msg)
     if len(m) > 1:
         msg = 'Found multiple workflow matching with search query.'
         raise ValueError(msg)
@@ -442,11 +445,12 @@ def get_single_cromwell_metadata_obj(
 ) -> CromwellMetadata:
     """Get a single Cromwell metadata object from file or server."""
     if not wf_id_or_label:
-        raise ValueError(
+        msg = (
             'Define at least one metadata JSON file or '
             'a search query for workflow ID/string label '
             'if there is a running Caper server.'
         )
+        raise ValueError(msg)
     if len(wf_id_or_label) > 1:
         msg = (
             f'Multiple files/queries are not allowed for {subcmd}. '
@@ -460,13 +464,15 @@ def get_single_cromwell_metadata_obj(
     if metadata_file.exists:
         metadata = json.loads(metadata_file.read())
     else:
-        metadata_objs = caper_client.metadata(
-            wf_ids_or_labels=wf_id_or_label, embed_subworkflow=True
+        metadata_objs = (
+            caper_client.metadata(wf_ids_or_labels=wf_id_or_label, embed_subworkflow=True) or []
         )
         if len(metadata_objs) > 1:
-            raise ValueError('Found multiple workflows matching with search query.')
+            msg = 'Found multiple workflows matching with search query.'
+            raise ValueError(msg)
         if len(metadata_objs) == 0:
-            raise ValueError('Found no workflow matching with search query.')
+            msg = 'Found no workflow matching with search query.'
+            raise ValueError(msg)
         metadata = metadata_objs[0]
 
     return CromwellMetadata(metadata)
@@ -475,7 +481,7 @@ def get_single_cromwell_metadata_obj(
 def split_list_into_file_and_non_file(
     lst: list[str],
 ) -> tuple[list[str], list[str]]:
-    """Returns tuple of (list of existing files, list of non-file strings)"""
+    """Returns tuple of (list of existing files, list of non-file strings)."""
     files = []
     non_files = []
 
@@ -493,11 +499,11 @@ def get_multi_cromwell_metadata_objs(
 ) -> list[CromwellMetadata]:
     """Get multiple Cromwell metadata objects from files or server."""
     if not wf_id_or_label:
-        raise ValueError(
-            'Define at least one metadata JSON file or '
-            'a search query for workflow ID/string label '
-            'if there is a running Caper server.'
+        msg = (
+            'Define at least one metadata JSON file or a search query for workflow ID/string '
+            'label if there is a running Caper server.'
         )
+        raise ValueError(msg)
 
     files, non_files = split_list_into_file_and_non_file(wf_id_or_label)
 
@@ -508,11 +514,12 @@ def get_multi_cromwell_metadata_objs(
 
     if non_files:
         all_metadata.extend(
-            caper_client.metadata(wf_ids_or_labels=non_files, embed_subworkflow=True)
+            caper_client.metadata(wf_ids_or_labels=non_files, embed_subworkflow=True) or []
         )
 
     if not all_metadata:
-        raise ValueError('Found no metadata/workflow matching with search query.')
+        msg = 'Found no metadata/workflow matching with search query.'
+        raise ValueError(msg)
     return [CromwellMetadata(m) for m in all_metadata]
 
 
@@ -729,4 +736,3 @@ def handle_hpc_abort(args: HpcAbortArgs) -> None:
 
     stdout = wrapper.abort(args.job_ids)
     print(stdout)  # noqa: T201
-
