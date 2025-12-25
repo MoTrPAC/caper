@@ -1,4 +1,5 @@
-"""dictTool: merge/split/flatten/unflatten dict
+"""
+dictTool: merge/split/flatten/unflatten dict.
 
 Author:
     Jin Lee (leepc12@gmail.com) at ENCODE-DCC
@@ -6,23 +7,20 @@ Author:
 
 import re
 from collections import defaultdict
-
-try:
-    from collections.abc import MutableMapping
-except AttributeError:
-    from collections import MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping
+from typing import Any, overload
 
 
-def merge_dict(a, b):
-    """Merges b into a recursively. This mutates a and overwrites
-    items in b on a for conflicts.
+def merge_dict[U: MutableMapping[str, Any], W: Mapping[str, Any]](a: U, b: W) -> U:
+    """
+    Merges b into a recursively.
 
-    Ref: https://stackoverflow.com/questions/7204805/dictionaries
-    -of-dictionaries-merge/7205107#7205107
+    This mutates a and overwrites items in b on a for conflicts.
+    Ref: https://stackoverflow.com/questions/7204805/dictionaries-of-dictionaries-merge/7205107#7205107
     """
     for key in b:
         if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
+            if isinstance(a[key], MutableMapping) and isinstance(b[key], MutableMapping):
                 merge_dict(a[key], b[key])
             elif a[key] == b[key]:
                 pass
@@ -33,14 +31,35 @@ def merge_dict(a, b):
     return a
 
 
-def flatten_dict(d, reducer=None, parent_key=()):
-    """Flattens dict into single-level-tuple-keyed dict with
-        {(tuple of keys of parents and self): value}
+@overload
+def flatten_dict[W: Mapping[str, Any]](
+    d: W,
+    reducer: str,
+    parent_key: tuple[str, ...] = (),
+) -> dict[str, Any]: ...
+@overload
+def flatten_dict[W: Mapping[str, Any]](
+    d: W,
+    reducer: None = None,
+    parent_key: tuple[str, ...] = (),
+) -> dict[tuple[str, ...], Any] | W: ...
+def flatten_dict[W: Mapping[str, Any]](
+    d: W, reducer: str | None = None, parent_key: tuple[str, ...] = ()
+) -> dict[str, Any] | dict[tuple[str, ...], Any] | W:
+    """
+    Flattens dict into single-level-tuple-keyed dict.
+
+    Result looks like: {(tuple of keys of parents and self): value}
 
     Args:
+        d:
+            Dictionary/Mapping to flatten.
         reducer:
             Character to join keys in a tuple.
             If None, returns with key as a tuple.
+        parent_key:
+            Optional tuple of keys of parents to start from.
+
     Returns:
         dict of {
             (key_lvl1, key_lvl2, key_lvl3, ...): value
@@ -49,19 +68,28 @@ def flatten_dict(d, reducer=None, parent_key=()):
     items = []
     for k, v in d.items():
         new_key = parent_key + (k if isinstance(k, tuple) else (k,))
-        if isinstance(v, MutableMapping):
+        if isinstance(v, Mapping):
             items.extend(flatten_dict(v, parent_key=new_key).items())
         else:
             items.append((new_key, v))
     if reducer:
-        return {reducer.join(k): v for k, v in type(d)(items).items()}
-    else:
-        return type(d)(items)
+        return {reducer.join(k): v for k, v in items}
+
+    return type(d)(items)
 
 
-def recurse_dict_value(d, fnc):
-    if isinstance(d, dict):
-        for k, v in d.items():
+def recurse_dict_value(d: Mapping[str, Any], fnc: Callable[[Any], None]) -> None:
+    """
+    Recursively apply a function to the values of a dictionary.
+
+    Args:
+        d:
+            Dictionary to recurse on.
+        fnc:
+            Function to apply to the values of the dictionary.
+    """
+    if isinstance(d, Mapping):
+        for v in d.values():
             recurse_dict_value(v, fnc)
 
     elif isinstance(d, (list, tuple)):
@@ -71,8 +99,17 @@ def recurse_dict_value(d, fnc):
         fnc(d)
 
 
-def unflatten_dict(d_flat):
-    """Unflattens single-level-tuple-keyed dict into dict"""
+def unflatten_dict[U: MutableMapping[str, Any]](d_flat: U) -> U:
+    """
+    Unflattens single-level-tuple-keyed dict into dict.
+
+    Args:
+        d_flat:
+            Dictionary/Mapping to unflatten.
+
+    Returns:
+        Dictionary/Mapping of the same concrete type as d_flat.
+    """
     result = type(d_flat)()
     for k_tuple, v in d_flat.items():
         d_curr = result
@@ -85,13 +122,16 @@ def unflatten_dict(d_flat):
     return result
 
 
-def split_dict(d, rules=None):
-    """Splits dict according to "rule"
+def split_dict[W: Mapping[str, Any]](d: W, rules: list[tuple[str, str]] | None = None) -> list[W]:
+    r"""
+    Splits dict according to "rule".
 
     Returns:
         List of split dict
 
     Args:
+        d:
+            Dictionary/Mapping to split.
         rule:
             A list of tuple (RULE_NAME: REGEX)
 
@@ -202,12 +242,17 @@ def split_dict(d, rules=None):
             d_others[k_tuple] = v
     if d_others:
         d_ = unflatten_dict(d_others)
-        result = [d_] + result
+        result = [d_, *result]
     return result
 
 
-def dict_to_dot_str(d, parent_key='digraph D', indent='', base_indent=''):
-    """Dict will be converted into DOT like the followings:
+def dict_to_dot_str[W: Mapping[str, Any]](
+    d: W, parent_key: str = 'digraph D', indent: str = '', base_indent: str = ''
+) -> str:
+    r"""
+    Converts dict into DOT string.
+
+    Dict will be converted into DOT like the followings:
         1) Value string will not be double-quotted in DOT.
             - make sure to escape double-quotes in a string with special characters
             (e.g. whitespace, # and ;)
@@ -272,10 +317,10 @@ def dict_to_dot_str(d, parent_key='digraph D', indent='', base_indent=''):
     """
     result = ''
     if d is None:
-        return '{}{};\n'.format(base_indent, parent_key)
-    elif isinstance(d, str):
-        return '{}{} = {};\n'.format(base_indent, parent_key, d)
-    elif isinstance(d, dict):
+        return f'{base_indent}{parent_key};\n'
+    if isinstance(d, str):
+        return f'{base_indent}{parent_key} = {d};\n'
+    if isinstance(d, Mapping):
         result += base_indent + parent_key + ' {\n'
         for k, v in d.items():
             result += dict_to_dot_str(
@@ -283,8 +328,6 @@ def dict_to_dot_str(d, parent_key='digraph D', indent='', base_indent=''):
             )
         result += base_indent + '}\n'
     else:
-        raise ValueError(
-            'Unsupported data type: {} '
-            '(only str and dict/JSON are allowed).'.format(type(d))
-        )
+        msg = f'Unsupported data type: {type(d)} (only str and dict/JSON are allowed).'
+        raise TypeError(msg)
     return result
