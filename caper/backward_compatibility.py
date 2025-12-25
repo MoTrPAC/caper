@@ -1,5 +1,4 @@
-"""Variables and functions for backward_compatibililty
-"""
+"""Variables and functions for backward_compatibililty."""
 
 CAPER_1_0_0_PARAM_KEY_NAME_CHANGE = {
     'out_dir': 'local_out_dir',

@@ -1,12 +1,23 @@
+"""Utility functions for combining configuration files with argparse arguments."""
+
+from __future__ import annotations
+
 import os
 from argparse import ArgumentParser
 from configparser import ConfigParser, MissingSectionHeaderError
+from typing import cast
 
 
 def read_from_conf(
-    conf_file, conf_section='defaults', conf_key_map=None, no_strip_quote=False
-):
-    """Read key/value from conf_section of conf_file.
+    conf_file: str,
+    conf_section: str = 'defaults',
+    conf_key_map: dict[str, str] | None = None,
+    *,
+    no_strip_quote: bool = False,
+) -> dict[str, str | None]:
+    """
+    Read key/value from conf_section of conf_file.
+
     Hyphens (-) in keys will be replace with underscores (_).
     All keys and values are considered as strings.
 
@@ -32,43 +43,50 @@ def read_from_conf(
     """
     conf_file = os.path.expanduser(conf_file)
     if not os.path.exists(conf_file):
-        raise FileNotFoundError('conf_file does not exist. f={f}'.format(f=conf_file))
+        msg = f'conf_file does not exist. f={conf_file}'
+        raise FileNotFoundError(msg)
 
     config = ConfigParser()
     with open(conf_file) as fp:
-        s = fp.read()
+        config_content = fp.read()
         try:
-            config.read_string(s)
+            config.read_string(config_content)
         except MissingSectionHeaderError:
-            section = '[{sect}]\n'.format(sect=conf_section)
-            config.read_string(section + s)
+            # Add the section if it's missing
+            config.read_string(f'[{conf_section}]\n' + config_content)
 
-    d_ = dict(config.items(conf_section))
-    result = {}
-    for k, v in d_.items():
-        if not no_strip_quote:
-            v = v.strip('"\'')
-        if v:
-            k_ = k.replace('-', '_')
-            if conf_key_map and k_ in conf_key_map:
-                k_ = conf_key_map[k_]
-            result[k_] = v
+    section_items = dict(config.items(conf_section))
+    processed: dict[str, str | None] = {}
+    for raw_key, raw_value in section_items.items():
+        value = raw_value if no_strip_quote else raw_value.strip('"\'')
 
-    return result
+        if value:  # Ignore empty values
+            key = raw_key.replace('-', '_')
+            if conf_key_map and key in conf_key_map:
+                key = conf_key_map[key]
+            processed[key] = value
+
+    return processed
+
+
+def strtobool(value: str) -> bool:
+    """Copy of (now deprecated) distutils.util.strtobool."""
+    return value.strip().lower() in ('y', 'yes', 'on', '1', 'true', 't')
 
 
 def update_parsers_defaults_with_conf(
-    parsers,
-    conf_file,
-    conf_section='defaults',
-    conf_key_map=None,
-    no_strip_quote=False,
-    val_type=None,
-    val_default=None,
-):
-    """Updates argparse.ArgumentParser's defaults with key/value pairs
-    defined in conf_file. Also, returns a dict of key/values defined in
-    conf_file with correct type for each value.
+    parsers: ArgumentParser | list[ArgumentParser],
+    conf_file: str,
+    conf_section: str = 'defaults',
+    conf_key_map: dict[str, str] | None = None,
+    no_strip_quote: bool = False,
+    val_type: dict[str, type] | None = None,
+    val_default: dict[str, str | bool | int | float | None] | None = None,
+) -> dict[str, str | bool | int | float | None]:
+    """
+    Updates argparse.ArgumentParser's defaults with key/value pairs defined in conf_file.
+
+    Also, returns a dict of key/values defined in conf_file with correct type for each value.
 
     Type of each value in conf_file can be guessed from:
         - default value of ArgumentParser's argument.
@@ -112,20 +130,24 @@ def update_parsers_defaults_with_conf(
     if isinstance(parsers, ArgumentParser):
         parsers = [parsers]
 
-    defaults = read_from_conf(
-        conf_file=conf_file,
-        conf_section=conf_section,
-        conf_key_map=conf_key_map,
-        no_strip_quote=no_strip_quote,
+    defaults = cast(
+        'dict[str, str | bool | int | float | None]',
+        read_from_conf(
+            conf_file=conf_file,
+            conf_section=conf_section,
+            conf_key_map=conf_key_map,
+            no_strip_quote=no_strip_quote,
+        ),
     )
 
     if val_default:
-        for k, v in val_default.items():
+        for k in val_default:
             if k not in defaults:
                 defaults[k] = None
 
     # used "is not None" for guessed_default to catch boolean false
     for k, v in defaults.items():
+        guessed_default = None
         if val_default and k in val_default:
             guessed_default = val_default[k]
         else:
@@ -141,16 +163,9 @@ def update_parsers_defaults_with_conf(
             guessed_type = None
 
         if v is None and guessed_default is not None:
-            v = guessed_default
-            defaults[k] = v
+            defaults[k] = guessed_default
 
-        def strtobool(value: str) -> bool:
-            value = value.lower()
-            if value in ('y', 'yes', 'on', '1', 'true', 't'):
-                return True
-            return False
-
-        if guessed_type:
+        if guessed_type and v is not None:
             if guessed_type is bool and isinstance(v, str):
                 defaults[k] = bool(strtobool(v))
             else:
