@@ -1,3 +1,9 @@
+# ARCHIVED - 2019 ENCODE Users' Meeting Pipeline Workshop
+
+> **NOTE**: This document is archived and preserved for historical reference only. It was created for a specific workshop in 2019 and the instructions may no longer be accurate or relevant. For current setup instructions, please see the main [README](../README.md) and [DETAILS](../DETAILS.md).
+
+---
+
 # Welcome to the 2019 ENCODE Users' Meeting Pipeline Workshop
 
 ## Do this before the workshop
