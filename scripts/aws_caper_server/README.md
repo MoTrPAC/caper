@@ -169,4 +169,4 @@ https://docs.opendata.aws/genomics-workflows/orchestration/cromwell/cromwell-ove
 
 ## Troubleshooting
 
-See [this] for troubleshooting.
+See the main [DETAILS.md](../../DETAILS.md) documentation for troubleshooting information.
