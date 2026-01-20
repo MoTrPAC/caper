@@ -1,14 +1,18 @@
+"""Caper workflow options."""
+
+from __future__ import annotations
+
 import copy
 import json
 import logging
 import os
+from typing import Any
 
 from autouri import GCSURI, AutoURI
 
 from .caper_wdl_parser import CaperWDLParser
 from .cromwell_backend import (
-    BACKEND_AWS,
-    BACKEND_GCP,
+    BackendProvider,
     ENVIRONMENT_CONDA,
     ENVIRONMENT_DOCKER,
     ENVIRONMENT_SINGULARITY,
@@ -20,33 +24,35 @@ logger = logging.getLogger(__name__)
 
 
 class CaperWorkflowOpts:
+    """Manage Cromwell workflow options JSON file."""
+
     DEFAULT_RUNTIME_ATTRIBUTES = 'default_runtime_attributes'
     BASENAME_WORKFLOW_OPTS_JSON = 'workflow_opts.json'
     DEFAULT_MAX_RETRIES = 1
     DEFAULT_MEMORY_RETRY_MULTIPLIER = 1.2
-    DEFAULT_GCP_MONITORING_SCRIPT = (
-        'gs://caper-data/scripts/resource_monitor/resource_monitor.sh'
-    )
+    DEFAULT_GCP_MONITORING_SCRIPT = 'gs://caper-data/scripts/resource_monitor/resource_monitor.sh'
 
     def __init__(
         self,
-        gcp_zones=None,
-        gcp_compute_service_account=None,
-        slurm_partition=None,
-        slurm_account=None,
-        slurm_extra_param=None,
-        sge_pe=None,
-        sge_queue=None,
-        sge_extra_param=None,
-        pbs_queue=None,
-        pbs_extra_param=None,
-        lsf_queue=None,
-        lsf_extra_param=None,
-    ):
-        """Template for a workflows options JSON file.
+        gcp_zones: list[str] | None = None,
+        gcp_compute_service_account: str | None = None,
+        slurm_partition: str | None = None,
+        slurm_account: str | None = None,
+        slurm_extra_param: str | None = None,
+        sge_pe: str | None = None,
+        sge_queue: str | None = None,
+        sge_extra_param: str | None = None,
+        pbs_queue: str | None = None,
+        pbs_extra_param: str | None = None,
+        lsf_queue: str | None = None,
+        lsf_extra_param: str | None = None,
+    ) -> None:
+        """
+        Template for a workflows options JSON file.
+
         All parameters are optional.
 
-        If parameters have been set at the backend-level, these workflow-level options will 
+        If parameters have been set at the backend-level, these workflow-level options will
         override them.
 
         Args:
@@ -93,15 +99,15 @@ class CaperWorkflowOpts:
                 Extra parameters for LSF.
                 This will be appended to "bsub" command line.
         """
-        self._template = {CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES: dict()}
-        default_runtime_attributes = self._template[
-            CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES
-        ]
+        self._template: dict[str, Any] = {CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES: {}}
+        default_runtime_attributes = self._template[CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES]
 
         if gcp_zones:
             default_runtime_attributes['zones'] = ' '.join(gcp_zones)
         if gcp_compute_service_account:
-            default_runtime_attributes['google_compute_service_account'] = gcp_compute_service_account
+            default_runtime_attributes['google_compute_service_account'] = (
+                gcp_compute_service_account
+            )
 
         if slurm_partition:
             default_runtime_attributes['slurm_partition'] = slurm_partition
@@ -129,20 +135,22 @@ class CaperWorkflowOpts:
 
     def create_file(
         self,
-        directory,
-        wdl,
-        backend=None,
-        inputs=None,
-        custom_options=None,
-        docker=None,
-        singularity=None,
-        conda=None,
-        max_retries=DEFAULT_MAX_RETRIES,
-        memory_retry_multiplier=DEFAULT_MEMORY_RETRY_MULTIPLIER,
-        gcp_monitoring_script=DEFAULT_GCP_MONITORING_SCRIPT,
-        basename=BASENAME_WORKFLOW_OPTS_JSON,
-    ):
-        """Creates Cromwell's workflow options JSON file.
+        directory: str,
+        wdl: str,
+        backend: str | None = None,
+        inputs: str | None = None,
+        custom_options: str | None = None,
+        docker: str | None = None,
+        singularity: str | None = None,
+        conda: str | None = None,
+        max_retries: int | None = DEFAULT_MAX_RETRIES,
+        memory_retry_multiplier: float | None = DEFAULT_MEMORY_RETRY_MULTIPLIER,
+        gcp_monitoring_script: str | None = DEFAULT_GCP_MONITORING_SCRIPT,
+        basename: str = BASENAME_WORKFLOW_OPTS_JSON,
+    ) -> str:
+        """
+        Creates Cromwell's workflow options JSON file.
+
         Workflow options JSON file sets default values for attributes
         defined in runtime {} section of WDL's task.
         For example, docker attribute can be defined here instead of directory
@@ -189,12 +197,11 @@ class CaperWorkflowOpts:
                 Basename for a temporary workflow options JSON file.
         """
         if singularity and docker:
-            raise ValueError('Cannot use both Singularity and Docker.')
+            msg = 'Cannot use both Singularity and Docker.'
+            raise ValueError(msg)
 
         template = copy.deepcopy(self._template)
-        default_runtime_attributes = template[
-            CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES
-        ]
+        default_runtime_attributes = template[CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES]
 
         if backend:
             template['backend'] = backend
@@ -204,10 +211,11 @@ class CaperWorkflowOpts:
         # sanity check for environment flags
         defined_env_flags = [env for env in (docker, singularity, conda) if env]
         if len(defined_env_flags) > 1:
-            raise ValueError(
+            msg = (
                 'docker, singularity and conda are mutually exclusive. '
-                'Define nothing or only one environment.'
+                'Define only one or none of these environments.'
             )
+            raise ValueError(msg)
 
         if docker is not None:
             environment = ENVIRONMENT_DOCKER
@@ -221,89 +229,65 @@ class CaperWorkflowOpts:
         if environment:
             default_runtime_attributes['environment'] = environment
 
-        if docker == '' or backend in (BACKEND_GCP, BACKEND_AWS) and not docker:
+        if docker == '' or (backend in (BackendProvider.GCP, BackendProvider.AWS) and not docker):
             # if used as a flag or cloud backend is chosen
             # try to find "default_docker" from WDL's workflow.meta or "#CAPER docker" from comments
             docker = wdl_parser.default_docker
             if docker:
-                logger.info(
-                    'Docker image found in WDL metadata. wdl={wdl}, d={d}'.format(
-                        wdl=wdl, d=docker
-                    )
-                )
+                logger.info('Docker image found in WDL metadata. wdl=%s, d=%s', wdl, docker)
             else:
-                logger.info(
-                    "Docker image not found in WDL metadata. wdl={wdl}".format(wdl=wdl)
-                )
+                logger.info('Docker image not found in WDL metadata. wdl=%s', wdl)
 
         if docker:
             default_runtime_attributes['docker'] = docker
 
         if singularity == '':
             # if used as a flag
-            if backend in (BACKEND_GCP, BACKEND_AWS):
-                raise ValueError(
-                    'Singularity cannot be used for cloud backend (e.g. aws, gcp).'
-                )
+            if backend in (BackendProvider.GCP, BackendProvider.AWS):
+                msg = 'Singularity cannot be used for cloud backend (e.g. aws, gcp).'
+                raise ValueError(msg)
 
             singularity = wdl_parser.default_singularity
             if singularity:
                 logger.info(
-                    'Singularity image found in WDL metadata. wdl={wdl}, s={s}'.format(
-                        wdl=wdl, s=singularity
-                    )
+                    'Singularity image found in WDL metadata. wdl=%s, s=%s', wdl, singularity
                 )
             else:
-                logger.info(
-                    'Singularity image not found in WDL metadata. wdl={wdl}.'.format(
-                        wdl=wdl
-                    )
-                )
+                logger.info('Singularity image not found in WDL metadata. wdl=%s.', wdl)
 
         if singularity:
             default_runtime_attributes['singularity'] = singularity
             if inputs:
-                default_runtime_attributes['singularity_bindpath'] = find_bindpath(
-                    inputs
-                )
+                default_runtime_attributes['singularity_bindpath'] = find_bindpath(inputs)
 
         if conda == '':
             # if used as a flag
-            if backend in (BACKEND_GCP, BACKEND_AWS):
-                raise ValueError(
-                    'Conda cannot be used for cloud backend (e.g. aws, gcp).'
-                )
+            if backend in (BackendProvider.GCP, BackendProvider.AWS):
+                msg = 'Conda cannot be used for cloud backend (e.g. aws, gcp).'
+                raise ValueError(msg)
             conda = wdl_parser.default_conda
             if conda:
                 logger.info(
-                    'Conda environment name found in WDL metadata. wdl={wdl}, s={s}'.format(
-                        wdl=wdl, s=conda
-                    )
+                    'Conda environment name found in WDL metadata. wdl=%s, s=%s', wdl, conda
                 )
             else:
-                logger.info(
-                    'Conda environment name not found in WDL metadata. wdl={wdl}'.format(
-                        wdl=wdl
-                    )
-                )
+                logger.info('Conda environment name not found in WDL metadata. wdl=%s', wdl)
 
         if conda:
             default_runtime_attributes['conda'] = conda
 
         if max_retries is not None:
             default_runtime_attributes['maxRetries'] = max_retries
-        # Cromwell's bug in memory-retry feature.
+
+        # Cromwell has a bug in memory-retry feature.
         # Disabled until it's fixed on Cromwell's side.
         # if memory_retry_multiplier is not None:
-        #     template['memory_retry_multiplier'] = memory_retry_multiplier
+        #     template['memory_retry_multiplier'] = memory_retry_multiplier  # noqa: ERA001
 
-        if gcp_monitoring_script and backend == BACKEND_GCP:
+        if gcp_monitoring_script and backend == BackendProvider.GCP:
             if not GCSURI(gcp_monitoring_script).is_valid:
-                raise ValueError(
-                    'gcp_monitoring_script is not a valid URI. {uri}'.format(
-                        uri=gcp_monitoring_script
-                    )
-                )
+                msg = f'gcp_monitoring_script is not a valid URI. {gcp_monitoring_script}'
+                raise ValueError(msg)
             template['monitoring_script'] = gcp_monitoring_script
 
         if custom_options:

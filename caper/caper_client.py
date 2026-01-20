@@ -1,4 +1,8 @@
+"""Client for interacting with Cromwell server."""
+
 import logging
+from collections.abc import Sequence
+from typing import Any
 
 from autouri import AutoURI
 
@@ -8,24 +12,36 @@ from .caper_wdl_parser import CaperWDLParser
 from .caper_workflow_opts import CaperWorkflowOpts
 from .cromwell import Cromwell
 from .cromwell_rest_api import CromwellRestAPI, has_wildcard, is_valid_uuid
+from .server_heartbeat import ServerHeartbeat
 
 logger = logging.getLogger(__name__)
 
 
 class CaperClient(CaperBase):
+    """Client for interacting with a Cromwell server."""
+
     def __init__(
         self,
-        local_loc_dir=None,
-        gcp_loc_dir=None,
-        aws_loc_dir=None,
-        gcp_service_account_key_json=None,
-        server_hostname=CromwellRestAPI.DEFAULT_HOSTNAME,
-        server_port=CromwellRestAPI.DEFAULT_PORT,
-        server_heartbeat=None,
-    ):
-        """Initializes for Caper's client functions.
+        local_loc_dir: str | None = None,
+        gcp_loc_dir: str | None = None,
+        aws_loc_dir: str | None = None,
+        gcp_service_account_key_json: str | None = None,
+        server_hostname: str = CromwellRestAPI.DEFAULT_HOSTNAME,
+        server_port: int = CromwellRestAPI.DEFAULT_PORT,
+        server_heartbeat: ServerHeartbeat | None = None,
+    ) -> None:
+        """
+        Initializes for Caper's client functions.
 
         Args:
+            local_loc_dir:
+                Local cache directory for localization.
+            gcp_loc_dir:
+                GCP cache directory (gs://) for localization.
+            aws_loc_dir:
+                AWS cache directory (s3://) for localization.
+            gcp_service_account_key_json:
+                GCP service account key JSON file for authentication.
             server_hostname:
                 Server hostname.
                 Used only if heartbeat file is not available or timed out.
@@ -49,15 +65,17 @@ class CaperClient(CaperBase):
                 server_hostname, server_port = res
 
         if not server_hostname or not server_port:
-            raise ValueError(
+            msg = (
                 'Server hostname/port must be defined '
                 'if server heartbeat is not available or timed out.'
             )
+            raise ValueError(msg)
 
         self._cromwell_rest_api = CromwellRestAPI(server_hostname, server_port)
 
-    def abort(self, wf_ids_or_labels):
-        """Abort running/pending workflows on a Cromwell server.
+    def abort(self, wf_ids_or_labels: Sequence[str]) -> Sequence[dict[str, Any]] | None:
+        """
+        Abort running/pending workflows on a Cromwell server.
 
         Args:
             wf_ids_or_labels:
@@ -67,11 +85,12 @@ class CaperClient(CaperBase):
         workflow_ids, labels = self._split_workflow_ids_and_labels(wf_ids_or_labels)
 
         r = self._cromwell_rest_api.abort(workflow_ids, labels)
-        logger.info('abort: {r}'.format(r=r))
+        logger.info('abort: %s', r)
         return r
 
-    def unhold(self, wf_ids_or_labels):
-        """Release hold of workflows on a Cromwell server.
+    def unhold(self, wf_ids_or_labels: Sequence[str]) -> Sequence[dict[str, Any]] | None:
+        """
+        Release hold of workflows on a Cromwell server.
 
         Args:
             wf_ids_or_labels:
@@ -81,11 +100,14 @@ class CaperClient(CaperBase):
         workflow_ids, labels = self._split_workflow_ids_and_labels(wf_ids_or_labels)
 
         r = self._cromwell_rest_api.release_hold(workflow_ids, labels)
-        logger.info('unhold: {r}'.format(r=r))
+        logger.info('unhold: %s', r)
         return r
 
-    def list(self, wf_ids_or_labels=None, exclude_subworkflow=True):
-        """Retrieves list of running/pending workflows from a Cromwell server
+    def list(
+        self, wf_ids_or_labels: Sequence[str] | None = None, exclude_subworkflow: bool = True
+    ) -> list[dict[str, Any]] | None:
+        """
+        Retrieves list of running/pending workflows from a Cromwell server.
 
         Args:
             wf_ids_or_labels:
@@ -107,8 +129,11 @@ class CaperClient(CaperBase):
             workflow_ids, labels, exclude_subworkflow=exclude_subworkflow
         )
 
-    def metadata(self, wf_ids_or_labels, embed_subworkflow=False):
-        """Retrieves metadata for workflows from a Cromwell server.
+    def metadata(
+        self, wf_ids_or_labels: Sequence[str], embed_subworkflow: bool = False
+    ) -> Sequence[dict[str, Any]]:
+        """
+        Retrieves metadata for workflows from a Cromwell server.
 
         Args:
             wf_ids_or_labels:
@@ -118,6 +143,7 @@ class CaperClient(CaperBase):
                 Recursively embed subworkflow's metadata JSON object
                 in parent workflow's metadata JSON.
                 This is to mimic behavior of Cromwell's run mode paramteter -m.
+
         Returns:
             List of metadata JSONs of matched worflows.
         """
@@ -127,7 +153,9 @@ class CaperClient(CaperBase):
             workflow_ids, labels, embed_subworkflow=embed_subworkflow
         )
 
-    def _split_workflow_ids_and_labels(self, workflow_ids_or_labels):
+    def _split_workflow_ids_and_labels(
+        self, workflow_ids_or_labels: Sequence[str] | None
+    ) -> tuple[Sequence[str], Sequence[tuple[str, str]]]:
         workflow_ids = []
         labels = []
 
@@ -144,32 +172,51 @@ class CaperClient(CaperBase):
 
 
 class CaperClientSubmit(CaperClient):
+    """Client for submitting workflows to a Cromwell server."""
+
     def __init__(
         self,
-        local_loc_dir=None,
-        gcp_loc_dir=None,
-        aws_loc_dir=None,
-        gcp_service_account_key_json=None,
-        gcp_compute_service_account=None,
-        server_hostname=CromwellRestAPI.DEFAULT_HOSTNAME,
-        server_port=CromwellRestAPI.DEFAULT_PORT,
-        server_heartbeat=None,
-        womtool=Cromwell.DEFAULT_WOMTOOL,
-        gcp_zones=None,
-        slurm_partition=None,
-        slurm_account=None,
-        slurm_extra_param=None,
-        sge_pe=None,
-        sge_queue=None,
-        sge_extra_param=None,
-        pbs_queue=None,
-        pbs_extra_param=None,
-        lsf_queue=None,
-        lsf_extra_param=None,
-    ):
-        """Submit subcommand needs much more parameters than other client subcommands.
+        local_loc_dir: str | None = None,
+        gcp_loc_dir: str | None = None,
+        aws_loc_dir: str | None = None,
+        gcp_service_account_key_json: str | None = None,
+        gcp_compute_service_account: str | None = None,
+        server_hostname: str = CromwellRestAPI.DEFAULT_HOSTNAME,
+        server_port: int = CromwellRestAPI.DEFAULT_PORT,
+        server_heartbeat: ServerHeartbeat | None = None,
+        womtool: str = Cromwell.DEFAULT_WOMTOOL,
+        gcp_zones: list[str] | None = None,
+        slurm_partition: str | None = None,
+        slurm_account: str | None = None,
+        slurm_extra_param: str | None = None,
+        sge_pe: str | None = None,
+        sge_queue: str | None = None,
+        sge_extra_param: str | None = None,
+        pbs_queue: str | None = None,
+        pbs_extra_param: str | None = None,
+        lsf_queue: str | None = None,
+        lsf_extra_param: str | None = None,
+    ) -> None:
+        """
+        Submit subcommand needs much more parameters than other client subcommands.
 
         Args:
+            local_loc_dir:
+                Local cache directory for localization.
+            gcp_loc_dir:
+                GCP cache directory (gs://) for localization.
+            aws_loc_dir:
+                AWS cache directory (s3://) for localization.
+            gcp_service_account_key_json:
+                GCP service account key JSON file for authentication.
+            gcp_compute_service_account:
+                Service account email to use for GCP compute instances.
+            server_hostname:
+                Server hostname.
+            server_port:
+                Server port.
+            server_heartbeat:
+                ServerHeartbeat object for reading hostname/port.
             womtool:
                 Womtool JAR file.
             gcp_zones:
@@ -226,28 +273,29 @@ class CaperClientSubmit(CaperClient):
 
     def submit(
         self,
-        wdl,
-        backend=None,
-        inputs=None,
-        options=None,
-        labels=None,
-        imports=None,
-        str_label=None,
-        user=None,
-        docker=None,
-        singularity=None,
-        conda=None,
-        max_retries=CaperWorkflowOpts.DEFAULT_MAX_RETRIES,
-        memory_retry_multiplier=CaperWorkflowOpts.DEFAULT_MEMORY_RETRY_MULTIPLIER,
-        gcp_monitoring_script=CaperWorkflowOpts.DEFAULT_GCP_MONITORING_SCRIPT,
-        ignore_womtool=False,
-        no_deepcopy=False,
-        hold=False,
-        java_heap_womtool=Cromwell.DEFAULT_JAVA_HEAP_WOMTOOL,
-        dry_run=False,
-        work_dir=None,
-    ):
-        """Submit a workflow to Cromwell server.
+        wdl: str,
+        backend: str | None = None,
+        inputs: str | None = None,
+        options: str | None = None,
+        labels: str | None = None,
+        imports: str | None = None,
+        str_label: str | None = None,
+        user: str | None = None,
+        docker: str | None = None,
+        singularity: str | None = None,
+        conda: str | None = None,
+        max_retries: int | None = CaperWorkflowOpts.DEFAULT_MAX_RETRIES,
+        memory_retry_multiplier: float | None = CaperWorkflowOpts.DEFAULT_MEMORY_RETRY_MULTIPLIER,
+        gcp_monitoring_script: str | None = CaperWorkflowOpts.DEFAULT_GCP_MONITORING_SCRIPT,
+        ignore_womtool: bool = False,
+        no_deepcopy: bool = False,
+        hold: bool = False,
+        java_heap_womtool: str = Cromwell.DEFAULT_JAVA_HEAP_WOMTOOL,
+        dry_run: bool = False,
+        work_dir: str | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Submit a workflow to Cromwell server.
 
         Args:
             wdl:
@@ -288,6 +336,8 @@ class CaperClientSubmit(CaperClient):
                 Multiplier for the memory retry feature.
                 See https://cromwell.readthedocs.io/en/develop/cromwell_features/RetryWithMoreMemory/
                 for details.
+            gcp_monitoring_script:
+                GCP monitoring script for resource monitoring in workflow options.
             ignore_womtool:
                 Disable Womtool validation for WDL/input JSON/imports.
             no_deepcopy:
@@ -311,7 +361,8 @@ class CaperClientSubmit(CaperClient):
         """
         wdl_file = AutoURI(wdl)
         if not wdl_file.exists:
-            raise FileNotFoundError('WDL does not exists. {wdl}'.format(wdl=wdl))
+            msg = f'WDL does not exists. {wdl}'
+            raise FileNotFoundError(msg)
 
         if str_label is None and inputs:
             str_label = AutoURI(inputs).basename_wo_ext
@@ -329,9 +380,8 @@ class CaperClientSubmit(CaperClient):
             # backend's localization directory.
             # check if such loc_dir is defined.
             if self.get_loc_dir(backend) is None:
-                raise ValueError(
-                    'loc_dir is not defined for your backend. {b}'.format(b=backend)
-                )
+                msg = f'loc_dir is not defined for your backend. {backend}'
+                raise ValueError(msg)
 
             maybe_remote_file = self.localize_on_backend_if_modified(
                 inputs, backend=backend, recursive=not no_deepcopy, make_md5_file=True
@@ -367,10 +417,13 @@ class CaperClientSubmit(CaperClient):
             imports = wdl_parser.create_imports_file(work_dir)
 
         logger.debug(
-            'submit params: wdl={wdl}, imports={imp}, inputs={inp}, '
-            'options={opt}, labels={lbl}, hold={hold}'.format(
-                wdl=wdl, imp=imports, inp=inputs, opt=options, lbl=labels, hold=hold
-            )
+            'submit params: wdl=%s, imports=%s, inputs=%s, options=%s, labels=%s, hold=%s',
+            wdl,
+            imports,
+            inputs,
+            options,
+            labels,
+            hold,
         )
 
         if not ignore_womtool:
@@ -382,7 +435,7 @@ class CaperClientSubmit(CaperClient):
             )
 
         if dry_run:
-            return
+            return None
 
         r = self._cromwell_rest_api.submit(
             source=wdl,
@@ -392,5 +445,5 @@ class CaperClientSubmit(CaperClient):
             labels=labels,
             on_hold=hold,
         )
-        logger.info('submit: {r}'.format(r=r))
+        logger.info('submit: %s', r)
         return r

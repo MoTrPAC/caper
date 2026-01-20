@@ -1,5 +1,8 @@
+"""Singularity container image management and caching."""
+
 import logging
 import os
+from typing import Literal
 
 from autouri import AbsPath, AutoURI, URIBase
 from autouri.loc_aux import recurse_json
@@ -10,8 +13,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_COMMON_ROOT_SEARCH_LEVEL = 5
 
 
-def find_bindpath(json_file, common_root_search_level=DEFAULT_COMMON_ROOT_SEARCH_LEVEL):
-    """Recursively find paths to be bound for singularity.
+def find_bindpath(
+    json_file: str, common_root_search_level: int = DEFAULT_COMMON_ROOT_SEARCH_LEVEL
+) -> str:
+    """
+    Recursively find paths to be bound for singularity.
+
     Find common roots for all files in an input JSON file.
     This function will recursively visit all values in input JSON and
     also JSON, TSV, CSV files in the input JSON itself.
@@ -40,7 +47,7 @@ def find_bindpath(json_file, common_root_search_level=DEFAULT_COMMON_ROOT_SEARCH
     json_contents = AutoURI(json_file).read()
     all_dirnames = []
 
-    def find_dirname(s):
+    def find_dirname(s: str) -> tuple[None, Literal[False]]:
         u = AbsPath(s)
         if u.is_valid:
             for ext, recurse_fnc_for_ext in URIBase.LOC_RECURSE_EXT_AND_FNC.items():

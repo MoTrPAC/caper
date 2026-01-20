@@ -1,23 +1,36 @@
-import json
+"""Cromwell backend configuration."""
+
+from __future__ import annotations
+
 import logging
 from collections import UserDict
 from copy import deepcopy
+from enum import StrEnum
 from textwrap import dedent
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from .dict_tool import merge_dict
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
 
-BACKEND_GCP = 'gcp'
-BACKEND_AWS = 'aws'
-BACKEND_LOCAL = 'Local'
-BACKEND_ALIAS_LOCAL = 'local'
-BACKEND_SLURM = 'slurm'
-BACKEND_SGE = 'sge'
-BACKEND_PBS = 'pbs'
-BACKEND_LSF = 'lsf'
-DEFAULT_BACKEND = BACKEND_LOCAL
+class BackendProvider(StrEnum):
+    """Backends supported by Cromwell/Caper."""
+
+    GCP = 'gcp'
+    AWS = 'aws'
+    LOCAL = 'local'
+    SLURM = 'slurm'
+    SGE = 'sge'
+    PBS = 'pbs'
+    LSF = 'lsf'
+
+
+DEFAULT_BACKEND = BackendProvider.LOCAL
+
 
 ENVIRONMENT_DOCKER = 'docker'
 ENVIRONMENT_SINGULARITY = 'singularity'
@@ -36,6 +49,11 @@ CALL_CACHING_DUP_STRAT_HARDLINK = 'hard-link'
 CALL_CACHING_DUP_STRAT_REFERENCE = 'reference'
 CALL_CACHING_DUP_STRAT_SOFTLINK = 'soft-link'
 
+CachingDuplicationStrategies = Literal['soft-link', 'hard-link', 'copy', 'reference']
+CachingDuplicationStrategyArgs = (
+    CachingDuplicationStrategies | tuple[CachingDuplicationStrategies, ...]
+)
+
 LOCAL_HASH_STRAT_FILE = 'file'
 LOCAL_HASH_STRAT_PATH = 'path'
 LOCAL_HASH_STRAT_PATH_MTIME = 'path+modtime'
@@ -43,20 +61,23 @@ LOCAL_HASH_START_XXH64 = 'xxh64'
 SOFT_GLOB_OUTPUT_CMD = 'ln -sL GLOB_PATTERN GLOB_DIRECTORY 2> /dev/null'
 
 
-def get_s3_bucket_name(s3_uri):
+def get_s3_bucket_name(s3_uri: str) -> str:
+    """Get the bucket name from an S3 URI."""
     return s3_uri.replace('s3://', '', 1).split('/')[0]
+
+
+type CromwellBackendConfigTemplate = dict[str, Any]
 
 
 class CromwellBackendCommon(UserDict):
     """Basic stanzas for Cromwell backend conf."""
 
-    TEMPLATE = {
+    TEMPLATE: ClassVar[CromwellBackendConfigTemplate] = {
         'backend': {},
         'webservice': {},
         'services': {
             'LoadController': {
-                'class': 'cromwell.services.loadcontroller.impl'
-                         '.LoadControllerServiceActor',
+                'class': 'cromwell.services.loadcontroller.impl.LoadControllerServiceActor',
                 'config': {
                     # added due to issues on stanford sherlock/scg
                     'control-frequency': '21474834 seconds'
@@ -77,13 +98,21 @@ class CromwellBackendCommon(UserDict):
 
     def __init__(
         self,
-        default_backend,
-        disable_call_caching=False,
-        max_concurrent_workflows=DEFAULT_MAX_CONCURRENT_WORKFLOWS,
-        memory_retry_error_keys=DEFAULT_MEMORY_RETRY_ERROR_KEYS,
-    ):
+        default_backend: BackendProvider | str | None,
+        disable_call_caching: bool = False,
+        max_concurrent_workflows: int = DEFAULT_MAX_CONCURRENT_WORKFLOWS,
+        memory_retry_error_keys: Sequence[str] | None = DEFAULT_MEMORY_RETRY_ERROR_KEYS,
+    ) -> None:
         """
+        Initializes the common options of the Cromwell backend configuration file.
+
         Args:
+            default_backend:
+                Default backend provider.
+            disable_call_caching:
+                Disable call-caching (re-using outputs from previous workflows/tasks).
+            max_concurrent_workflows:
+                Limit for concurrent number of workflows.
             memory_retry_error_keys:
                 List of error strings to catch out-of-memory error
                 See https://cromwell.readthedocs.io/en/develop/cromwell_features/RetryWithMoreMemory
@@ -98,20 +127,31 @@ class CromwellBackendCommon(UserDict):
         self['system']['max-concurrent-workflows'] = max_concurrent_workflows
         # Cromwell's bug in memory-retry feature.
         # Disabled until it's fixed on Cromwell's side.
-        # if memory_retry_error_keys:
-        #     if isinstance(memory_retry_error_keys, tuple):
-        #         memory_retry_error_keys = list(memory_retry_error_keys)
-        #     self['system']['memory-retry-error-keys'] = memory_retry_error_keys
+        if memory_retry_error_keys:
+            logger.warning(
+                'memory_retry_error_keys is not implemented due to upstream Cromwell bugs. '
+                'This argument will be ignored.'
+            )
+            # if isinstance(memory_retry_error_keys, tuple):
+            #     memory_retry_error_keys = list(memory_retry_error_keys)
+            # self['system']['memory-retry-error-keys'] = memory_retry_error_keys
 
 
 class CromwellBackendServer(UserDict):
     """Stanzas for Cromwell server."""
 
-    TEMPLATE = {'webservice': {}}
+    TEMPLATE: ClassVar[CromwellBackendConfigTemplate] = {'webservice': {}}
 
     DEFAULT_SERVER_PORT = 8000
 
-    def __init__(self, server_port=DEFAULT_SERVER_PORT):
+    def __init__(self, server_port: int = DEFAULT_SERVER_PORT) -> None:
+        """
+        Initialize the Cromwell backend server.
+
+        Args:
+            server_port:
+                The port for the Cromwell server.
+        """
         super().__init__(deepcopy(CromwellBackendServer.TEMPLATE))
 
         self['webservice']['port'] = server_port
@@ -120,7 +160,9 @@ class CromwellBackendServer(UserDict):
 class CromwellBackendDatabase(UserDict):
     """Common stanzas for Cromwell's metadata database."""
 
-    TEMPLATE = {'database': {'db': {'connectionTimeout': 5000, 'numThreads': 1}}}
+    TEMPLATE: ClassVar[CromwellBackendConfigTemplate] = {
+        'database': {'db': {'connectionTimeout': 5000, 'numThreads': 1}}
+    }
 
     DB_IN_MEMORY = 'in-memory'
     DB_FILE = 'file'
@@ -152,30 +194,30 @@ class CromwellBackendDatabase(UserDict):
     DEFAULT_MYSQL_DB_IP = 'localhost'
     DEFAULT_MYSQL_DB_PORT = 3306
     DEFAULT_MYSQL_DB_USER = 'cromwell'
-    DEFAULT_MYSQL_DB_PASSWORD = 'cromwell'
+    DEFAULT_MYSQL_DB_PASSWORD = 'cromwell'  # noqa: S105
     DEFAULT_MYSQL_DB_NAME = 'cromwell'
     DEFAULT_POSTGRESQL_DB_IP = 'localhost'
     DEFAULT_POSTGRESQL_DB_PORT = 5432
     DEFAULT_POSTGRESQL_DB_USER = 'cromwell'
-    DEFAULT_POSTGRESQL_DB_PASSWORD = 'cromwell'
+    DEFAULT_POSTGRESQL_DB_PASSWORD = 'cromwell'  # noqa: S105
     DEFAULT_POSTGRESQL_DB_NAME = 'cromwell'
 
     def __init__(
         self,
-        db=DEFAULT_DB,
-        db_timeout=DEFAULT_DB_TIMEOUT_MS,
-        mysql_db_ip=DEFAULT_MYSQL_DB_IP,
-        mysql_db_port=DEFAULT_MYSQL_DB_PORT,
-        mysql_db_user=DEFAULT_MYSQL_DB_USER,
-        mysql_db_password=DEFAULT_MYSQL_DB_PASSWORD,
-        mysql_db_name=DEFAULT_MYSQL_DB_NAME,
-        postgresql_db_ip=DEFAULT_POSTGRESQL_DB_IP,
-        postgresql_db_port=DEFAULT_POSTGRESQL_DB_PORT,
-        postgresql_db_user=DEFAULT_POSTGRESQL_DB_USER,
-        postgresql_db_password=DEFAULT_POSTGRESQL_DB_PASSWORD,
-        postgresql_db_name=DEFAULT_POSTGRESQL_DB_NAME,
-        file_db=None,
-    ):
+        db: str = DEFAULT_DB,
+        db_timeout: int = DEFAULT_DB_TIMEOUT_MS,
+        mysql_db_ip: str = DEFAULT_MYSQL_DB_IP,
+        mysql_db_port: int = DEFAULT_MYSQL_DB_PORT,
+        mysql_db_user: str = DEFAULT_MYSQL_DB_USER,
+        mysql_db_password: str = DEFAULT_MYSQL_DB_PASSWORD,
+        mysql_db_name: str = DEFAULT_MYSQL_DB_NAME,
+        postgresql_db_ip: str = DEFAULT_POSTGRESQL_DB_IP,
+        postgresql_db_port: int = DEFAULT_POSTGRESQL_DB_PORT,
+        postgresql_db_user: str = DEFAULT_POSTGRESQL_DB_USER,
+        postgresql_db_password: str = DEFAULT_POSTGRESQL_DB_PASSWORD,
+        postgresql_db_name: str = DEFAULT_POSTGRESQL_DB_NAME,
+        file_db: str | None = None,
+    ) -> None:
         super().__init__(deepcopy(CromwellBackendDatabase.TEMPLATE))
 
         database = self['database']
@@ -183,9 +225,9 @@ class CromwellBackendDatabase(UserDict):
 
         db_obj['connectionTimeout'] = db_timeout
 
-        if db == CromwellBackendDatabase.DB_FILE:
-            if not file_db:
-                raise ValueError('file_db must be defined for db {db}'.format(db=db))
+        if db == CromwellBackendDatabase.DB_FILE and file_db is None:
+            msg = f'file_db must be defined for db {db}'
+            raise ValueError(msg)
 
         if db == CromwellBackendDatabase.DB_IN_MEMORY:
             pass
@@ -213,15 +255,18 @@ class CromwellBackendDatabase(UserDict):
             db_obj['password'] = postgresql_db_password
 
         else:
-            raise ValueError('Unsupported DB type {db}'.format(db=db))
+            msg = f'Unsupported DB type {db}'
+            raise ValueError(msg)
 
 
 class CromwellBackendBase(UserDict):
-    """Base skeleton backend for all backends"""
+    """Base skeleton backend for all backends."""
 
-    TEMPLATE = {'backend': {'providers': {}}}
-    TEMPLATE_BACKEND = {'config': {'default-runtime-attributes': {}, 'filesystems': {}}}
-    DEFAULT_CALL_CACHING_DUP_STRAT = (
+    TEMPLATE: ClassVar[CromwellBackendConfigTemplate] = {'backend': {'providers': {}}}
+    TEMPLATE_BACKEND: ClassVar[CromwellBackendConfigTemplate] = {
+        'config': {'default-runtime-attributes': {}, 'filesystems': {}}
+    }
+    DEFAULT_CALL_CACHING_DUP_STRAT: ClassVar[CachingDuplicationStrategyArgs] = (
         CALL_CACHING_DUP_STRAT_SOFTLINK,
         CALL_CACHING_DUP_STRAT_HARDLINK,
         CALL_CACHING_DUP_STRAT_COPY,
@@ -230,12 +275,15 @@ class CromwellBackendBase(UserDict):
 
     def __init__(
         self,
-        backend_name,
-        max_concurrent_tasks=DEFAULT_CONCURRENT_JOB_LIMIT,
-        filesystem_name=None,
-        call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
-    ):
+        backend_name: str,
+        max_concurrent_tasks: int = DEFAULT_CONCURRENT_JOB_LIMIT,
+        filesystem_name: str | None = None,
+        call_caching_dup_strat: CachingDuplicationStrategies
+        | tuple[CachingDuplicationStrategies, ...] = DEFAULT_CALL_CACHING_DUP_STRAT,
+    ) -> None:
         """
+        Initialize the Cromwell backend base.
+
         Args:
             backend_name:
                 Backend's name.
@@ -250,7 +298,8 @@ class CromwellBackendBase(UserDict):
         super().__init__(deepcopy(CromwellBackendBase.TEMPLATE))
 
         if backend_name is None:
-            raise ValueError('backend_name must be provided.')
+            msg = 'backend_name must be provided.'
+            raise ValueError(msg)
         self._backend_name = backend_name
 
         self.backend = CromwellBackendBase.TEMPLATE_BACKEND
@@ -259,93 +308,107 @@ class CromwellBackendBase(UserDict):
         config['concurrent-job-limit'] = max_concurrent_tasks
 
         if filesystem_name:
-            if isinstance(call_caching_dup_strat, tuple):
-                call_caching_dup_strat = list(call_caching_dup_strat)
-
             config['filesystems'][filesystem_name] = {
-                'caching': {'duplication-strategy': call_caching_dup_strat}
+                'caching': {
+                    'duplication-strategy': list(call_caching_dup_strat)
+                    if isinstance(call_caching_dup_strat, tuple)
+                    else call_caching_dup_strat
+                }
             }
 
     @property
-    def backend(self):
+    def backend(self) -> CromwellBackendConfigTemplate:
         return self['backend']['providers'][self._backend_name]
 
     @backend.setter
-    def backend(self, backend):
+    def backend(self, backend: CromwellBackendConfigTemplate) -> None:
         self['backend']['providers'][self._backend_name] = deepcopy(backend)
 
-    def merge_backend(self, backend):
+    def merge_backend(self, backend: CromwellBackendConfigTemplate) -> None:
         merge_dict(self.backend, backend)
 
     @property
-    def backend_config(self):
+    def backend_config(self) -> CromwellBackendConfigTemplate:
         return self.backend['config']
 
     @property
-    def default_runtime_attributes(self):
+    def default_runtime_attributes(self) -> dict[str, Any]:
         """Backend's default runtime attributes in self.backend_config."""
         return self.backend_config['default-runtime-attributes']
 
 
 class CromwellBackendGcp(CromwellBackendBase):
-    TEMPLATE = {
+    """Google Cloud Platform backend configuration for Cromwell."""
+
+    TEMPLATE: ClassVar[CromwellBackendConfigTemplate] = {
         'google': {'application-name': 'cromwell'},
         'engine': {'filesystems': {FILESYSTEM_GCS: {'auth': 'default'}}},
     }
-    TEMPLATE_BACKEND = {
+    TEMPLATE_BACKEND: ClassVar[CromwellBackendConfigTemplate] = {
         'config': {
             'default-runtime-attributes': {},
             'maximum-polling-interval': 600,
             'localization-attempts': 3,
-            'batch': {}
+            'batch': {},
         }
     }
 
-    ACTOR_FACTORY_BATCH = (
-        'cromwell.backend.google.batch.GcpBatchBackendLifecycleActorFactory'
-    )
+    ACTOR_FACTORY_BATCH = 'cromwell.backend.google.batch.GcpBatchBackendLifecycleActorFactory'
     DEFAULT_REGION = 'us-central1'
-    DEFAULT_CALL_CACHING_DUP_STRAT = CALL_CACHING_DUP_STRAT_REFERENCE
+    DEFAULT_CALL_CACHING_DUP_STRAT: ClassVar[CachingDuplicationStrategyArgs] = (
+        CALL_CACHING_DUP_STRAT_REFERENCE,
+    )
 
-    LOGGING_POLICY_GOOGLE_CLOUD_STORAGE = "PATH"
-    LOGGING_POLICY_GOOGLE_CLOUD_LOGGING = "LOGGING"
+    LOGGING_POLICY_GOOGLE_CLOUD_STORAGE = 'PATH'
+    LOGGING_POLICY_GOOGLE_CLOUD_LOGGING = 'LOGGING'
 
     def __init__(
         self,
-        gcp_prj,
-        gcp_out_dir,
-        gcp_service_account_key_json=None,
-        gcp_compute_service_account=None,
-        gcp_region=DEFAULT_REGION,
-        gcp_logging_policy=LOGGING_POLICY_GOOGLE_CLOUD_STORAGE,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
-    ):
-        """
+        gcp_prj: str,
+        gcp_out_dir: str,
+        gcp_service_account_key_json: str | None = None,
+        gcp_compute_service_account: str | None = None,
+        gcp_region: str = DEFAULT_REGION,
+        gcp_logging_policy: str = LOGGING_POLICY_GOOGLE_CLOUD_STORAGE,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        call_caching_dup_strat: CachingDuplicationStrategyArgs = DEFAULT_CALL_CACHING_DUP_STRAT,
+    ) -> None:
+        """Initialize GCP backend configuration.
+
         Args:
+            gcp_prj:
+                Google project name.
+            gcp_out_dir:
+                Output bucket path for GCP backend (gs://).
             gcp_service_account_key_json:
                 Use this key JSON file to use service_account scheme
                 instead of application_default.
             gcp_compute_service_account:
                 Set this to override the Batch compute service account. Otherwise,
-                defaults to the project's compute engine service account. Ensure that 
-                this service account has the `roles/batch.agentReporter` role, so that 
+                defaults to the project's compute engine service account. Ensure that
+                this service account has the `roles/batch.agentReporter` role, so that
                 VM instances can report their status to Batch.
             gcp_region:
                 Region for Google Cloud Batch API.
+            gcp_logging_policy:
+                Logging policy for GCP backend (PATH or LOGGING).
+            max_concurrent_tasks:
+                Limit for concurrent number of tasks.
+            call_caching_dup_strat:
+                Call-caching duplication strategy for GCP backend.
         """
-        if call_caching_dup_strat not in (
-            CALL_CACHING_DUP_STRAT_REFERENCE,
-            CALL_CACHING_DUP_STRAT_COPY,
-        ):
-            raise ValueError(
-                'Wrong call_caching_dup_strat for GCP: {v}'.format(
-                    v=call_caching_dup_strat
-                )
-            )
+        valid_gcp_strategies = (CALL_CACHING_DUP_STRAT_REFERENCE, CALL_CACHING_DUP_STRAT_COPY)
+        if isinstance(call_caching_dup_strat, tuple):
+            invalid = [s for s in call_caching_dup_strat if s not in valid_gcp_strategies]
+            if invalid:
+                msg = f'Wrong call_caching_dup_strat for GCP: {call_caching_dup_strat}'
+                raise ValueError(msg)
+        elif call_caching_dup_strat not in valid_gcp_strategies:
+            msg = f'Wrong call_caching_dup_strat for GCP: {call_caching_dup_strat}'
+            raise ValueError(msg)
 
         super().__init__(
-            backend_name=BACKEND_GCP,
+            backend_name=BackendProvider.GCP,
             max_concurrent_tasks=max_concurrent_tasks,
             filesystem_name=FILESYSTEM_GCS,
             call_caching_dup_strat=call_caching_dup_strat,
@@ -357,28 +420,38 @@ class CromwellBackendGcp(CromwellBackendBase):
         batch = config['batch']
         filesystems = config['filesystems']
 
+        # Canonical Cromwell config structure for GCP Batch places Batch-specific knobs
+        # under `backend.providers.GCPBATCH.config.batch`.
         batch['location'] = gcp_region
         batch['logs-policy'] = gcp_logging_policy
+
+        # Fix duplication-strategy: GCS expects a single string, not a list
+        # The parent class converts tuples to lists, but GCS needs a string
+        if isinstance(call_caching_dup_strat, tuple) and len(call_caching_dup_strat) == 1:
+            filesystems[FILESYSTEM_GCS]['caching']['duplication-strategy'] = call_caching_dup_strat[
+                0
+            ]
+
         if gcp_service_account_key_json:
-            batch['auth'] = 'service-account'
-            filesystems[FILESYSTEM_GCS]['auth'] = 'service-account'
+            auth_name = 'service-account'
+            config['auth'] = auth_name
+            batch['auth'] = auth_name
+            filesystems[FILESYSTEM_GCS]['auth'] = auth_name
             self['google']['auths'] = [
                 {
-                    'name': 'service-account',
+                    'name': auth_name,
                     'scheme': 'service_account',
                     'json-file': gcp_service_account_key_json,
                 }
             ]
-            self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = 'service-account'
+            self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = auth_name
         else:
-            batch['auth'] = 'application-default'
-            filesystems[FILESYSTEM_GCS]['auth'] = 'application-default'
-            self['google']['auths'] = [
-                {'name': 'application-default', 'scheme': 'application_default'}
-            ]
-            self['engine']['filesystems'][FILESYSTEM_GCS][
-                'auth'
-            ] = 'application-default'
+            auth_name = 'application-default'
+            config['auth'] = auth_name
+            batch['auth'] = auth_name
+            filesystems[FILESYSTEM_GCS]['auth'] = auth_name
+            self['google']['auths'] = [{'name': auth_name, 'scheme': 'application_default'}]
+            self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = auth_name
 
         # If service account email is provided, use it for compute-service-account
         if gcp_compute_service_account:
@@ -390,21 +463,22 @@ class CromwellBackendGcp(CromwellBackendBase):
         self['engine']['filesystems'][FILESYSTEM_GCS]['project'] = gcp_prj
 
         if not gcp_out_dir.startswith('gs://'):
-            raise ValueError(
-                'Wrong GCS bucket URI for gcp_out_dir: {v}'.format(v=gcp_out_dir)
-            )
+            msg = f'Wrong GCS bucket URI for gcp_out_dir: {gcp_out_dir}'
+            raise ValueError(msg)
         config['root'] = gcp_out_dir
 
 
 class CromwellBackendAws(CromwellBackendBase):
-    TEMPLATE = {
+    """AWS Batch backend configuration for Cromwell."""
+
+    TEMPLATE: ClassVar = {
         'aws': {
             'application-name': 'cromwell',
             'auths': [{'name': 'default', 'scheme': 'default'}],
         },
         'engine': {'filesystems': {FILESYSTEM_S3: {'auth': 'default'}}},
     }
-    TEMPLATE_BACKEND = {
+    TEMPLATE_BACKEND: ClassVar = {
         'actor-factory': 'cromwell.backend.impl.aws.AwsBatchBackendLifecycleActorFactory',
         'config': {
             'default-runtime-attributes': {},
@@ -414,25 +488,24 @@ class CromwellBackendAws(CromwellBackendBase):
             'filesystems': {FILESYSTEM_S3: {'auth': 'default'}},
         },
     }
-    DEFAULT_CALL_CACHING_DUP_STRAT = CALL_CACHING_DUP_STRAT_REFERENCE
+    DEFAULT_CALL_CACHING_DUP_STRAT: ClassVar[CachingDuplicationStrategyArgs] = (
+        CALL_CACHING_DUP_STRAT_REFERENCE
+    )
 
     def __init__(
         self,
-        aws_batch_arn,
-        aws_region,
-        aws_out_dir,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
-    ):
+        aws_batch_arn: str,
+        aws_region: str,
+        aws_out_dir: str,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        call_caching_dup_strat: CachingDuplicationStrategyArgs = DEFAULT_CALL_CACHING_DUP_STRAT,
+    ) -> None:
         if call_caching_dup_strat not in (
             CALL_CACHING_DUP_STRAT_REFERENCE,
             CALL_CACHING_DUP_STRAT_COPY,
         ):
-            raise ValueError(
-                'Wrong call_caching_dup_strat for S3: {v}'.format(
-                    v=call_caching_dup_strat
-                )
-            )
+            msg = f'Wrong call_caching_dup_strat for S3: {call_caching_dup_strat}'
+            raise ValueError(msg)
         if call_caching_dup_strat == CALL_CACHING_DUP_STRAT_REFERENCE:
             logger.warning(
                 'Warning for aws backend: "reference" mode for call_caching_dup_strat currently '
@@ -442,13 +515,13 @@ class CromwellBackendAws(CromwellBackendBase):
                 '"reference" mode on gcp backend works fine. '
                 'See the following link for details. '
                 'https://github.com/broadinstitute/cromwell/issues/6327. '
-                'It is recommend to clean up previous workflow\'s outputs manually '
+                "It is recommend to clean up previous workflow's outputs manually "
                 'with "caper cleanup WORKFLOW_ID_OR_METADATA_JSON_FILE" or '
                 'with AWS CLI. e.g. '
                 '"aws s3 rm --recursive s3://some-bucket/a/b/c/WORKFLOW_ID". '
             )
         super().__init__(
-            backend_name=BACKEND_AWS,
+            backend_name=BackendProvider.AWS,
             max_concurrent_tasks=max_concurrent_tasks,
             filesystem_name=FILESYSTEM_S3,
             call_caching_dup_strat=call_caching_dup_strat,
@@ -456,23 +529,20 @@ class CromwellBackendAws(CromwellBackendBase):
         merge_dict(self.data, CromwellBackendAws.TEMPLATE)
         self.merge_backend(CromwellBackendAws.TEMPLATE_BACKEND)
 
-        aws = self[BACKEND_AWS]
+        aws = self[BackendProvider.AWS]
         aws['region'] = aws_region
 
         config = self.backend_config
         if not aws_out_dir.startswith('s3://'):
-            raise ValueError(
-                'Wrong S3 bucket URI for aws_out_dir: {v}'.format(v=aws_out_dir)
-            )
+            msg = f'Wrong S3 bucket URI for aws_out_dir: {aws_out_dir}'
+            raise ValueError(msg)
         config['root'] = aws_out_dir
-        self.default_runtime_attributes['scriptBucketName'] = get_s3_bucket_name(
-            aws_out_dir
-        )
+        self.default_runtime_attributes['scriptBucketName'] = get_s3_bucket_name(aws_out_dir)
         self.default_runtime_attributes['queueArn'] = aws_batch_arn
 
 
 class CromwellBackendLocal(CromwellBackendBase):
-    """Class constants:
+    """Class constants for Cromwell backend local.
 
     SUBMIT_DOCKER:
         Cromwell falls back to 'submit_docker' instead of 'submit' if WDL task has
@@ -493,7 +563,8 @@ class CromwellBackendLocal(CromwellBackendBase):
         Possible issue:
         - 'sed' is used here with a delimiter as hash mark (#)
           so hash marks in output path can result in error.
-        - Files globbed by WDL functions other than write_*() will still have paths inside a container.
+        - Files globbed by WDL functions other than write_*() will still have
+          paths inside a container.
     """
 
     RUNTIME_ATTRIBUTES = dedent(
@@ -603,9 +674,10 @@ class CromwellBackendLocal(CromwellBackendBase):
         fi
     """
     )
-    TEMPLATE_BACKEND = {
+    TEMPLATE_BACKEND: ClassVar[dict[str, Any]] = {
         'actor-factory': 'cromwell.backend.impl.sfs.config.ConfigBackendLifecycleActorFactory',
         'config': {
+            'run-in-background': True,
             'script-epilogue': 'sleep 5',
             'filesystems': {
                 FILESYSTEM_LOCAL: {
@@ -627,13 +699,14 @@ class CromwellBackendLocal(CromwellBackendBase):
 
     def __init__(
         self,
-        local_out_dir,
-        backend_name=BACKEND_LOCAL,
-        soft_glob_output=False,
-        local_hash_strat=DEFAULT_LOCAL_HASH_STRAT,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-    ):
-        """Base class for local backends.
+        local_out_dir: str,
+        backend_name: str = BackendProvider.LOCAL,
+        soft_glob_output: bool = False,
+        local_hash_strat: str = DEFAULT_LOCAL_HASH_STRAT,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+    ) -> None:
+        """
+        Base class for local backends.
 
         Used flock to synchronize local Singularity image building.
         Image building will occur in the first task and other parallel tasks will wait.
@@ -657,20 +730,22 @@ class CromwellBackendLocal(CromwellBackendBase):
             LOCAL_HASH_STRAT_PATH_MTIME,
             LOCAL_HASH_START_XXH64,
         ):
-            raise ValueError(
-                'Wrong local_hash_strat: {strat}'.format(strat=local_hash_strat)
-            )
+            msg = f'Wrong local_hash_strat: {local_hash_strat}'
+            raise ValueError(msg)
         caching['hashing-strategy'] = local_hash_strat
 
         if soft_glob_output:
             config['glob-link-command'] = SOFT_GLOB_OUTPUT_CMD
 
         if local_out_dir is None:
-            raise ValueError('local_out_dir must be provided.')
+            msg = 'local_out_dir must be provided.'
+            raise ValueError(msg)
         config['root'] = local_out_dir
 
 
 class CromwellBackendHpc(CromwellBackendLocal):
+    """Base HPC backend configuration for Cromwell."""
+
     HPC_RUNTIME_ATTRIBUTES = dedent(
         """
         Int cpu = 1
@@ -681,21 +756,32 @@ class CromwellBackendHpc(CromwellBackendLocal):
 
     def __init__(
         self,
-        local_out_dir,
-        backend_name=None,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        soft_glob_output=False,
-        local_hash_strat=CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
-        check_alive=None,
-        kill=None,
-        job_id_regex=None,
-        submit=None,
-        runtime_attributes=None,
-    ):
-        """Base class for HPCs.
+        local_out_dir: str,
+        backend_name: str,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        soft_glob_output: bool = False,
+        local_hash_strat: str = CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
+        check_alive: str | None = None,
+        kill: str | None = None,
+        job_id_regex: str | None = None,
+        submit: str | None = None,
+        runtime_attributes: str | None = None,
+    ) -> None:
+        r"""Base class for HPCs.
+
         No docker support. docker attribute in WDL task's runtime will be just ignored.
 
         Args:
+            local_out_dir:
+                Output directory for local backends.
+            backend_name:
+                Backend name identifier.
+            max_concurrent_tasks:
+                Limit for concurrent number of tasks.
+            soft_glob_output:
+                Glob with ln -s instead of hard-linking.
+            local_hash_strat:
+                Local file hashing strategy for call-caching.
             check_alive:
                 Shell command lines to check if a job exists.
                 WDL syntax allowed in ${} notation.
@@ -730,13 +816,17 @@ class CromwellBackendHpc(CromwellBackendLocal):
         config = self.backend_config
 
         if not check_alive:
-            raise ValueError('check_alive not defined!')
+            msg = 'check_alive not defined!'
+            raise ValueError(msg)
         if not kill:
-            raise ValueError('kill not defined!')
+            msg = 'kill not defined!'
+            raise ValueError(msg)
         if not job_id_regex:
-            raise ValueError('job_id_regex not defined!')
+            msg = 'job_id_regex not defined!'
+            raise ValueError(msg)
         if not submit:
-            raise ValueError('submit not defined!')
+            msg = 'submit not defined!'
+            raise ValueError(msg)
 
         config['check-alive'] = check_alive
         config['kill'] = kill
@@ -755,6 +845,8 @@ class CromwellBackendHpc(CromwellBackendLocal):
 
 
 class CromwellBackendSlurm(CromwellBackendHpc):
+    """SLURM backend configuration for Cromwell."""
+
     SLURM_RUNTIME_ATTRIBUTES = dedent(
         """
         String? slurm_partition
@@ -815,16 +907,18 @@ class CromwellBackendSlurm(CromwellBackendHpc):
 
     def __init__(
         self,
-        local_out_dir,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        soft_glob_output=False,
-        local_hash_strat=CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
-        slurm_partition=None,
-        slurm_account=None,
-        slurm_extra_param=None,
-        slurm_resource_param=DEFAULT_SLURM_RESOURCE_PARAM,
-    ):
-        """SLURM backend.
+        local_out_dir: str,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        soft_glob_output: bool = False,
+        local_hash_strat: str = CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
+        slurm_partition: str | None = None,
+        slurm_account: str | None = None,
+        slurm_extra_param: str | None = None,
+        slurm_resource_param: str = DEFAULT_SLURM_RESOURCE_PARAM,
+    ) -> None:
+        """
+        SLURM backend.
+
         Try sbatching up to 3 times every 30 second to prevent Cromwell
         from halting the whole pipeline immediately after the first failure.
 
@@ -837,6 +931,20 @@ class CromwellBackendSlurm(CromwellBackendHpc):
         So 'squeue --noheader -j JOB_ID' is used here and it checks if output is empty
 
         Args:
+            local_out_dir:
+                Output directory for local backends.
+            max_concurrent_tasks:
+                Limit for concurrent number of tasks.
+            soft_glob_output:
+                Glob with ln -s instead of hard-linking.
+            local_hash_strat:
+                Local file hashing strategy for call-caching.
+            slurm_partition:
+                SLURM partition if required to sbatch jobs.
+            slurm_account:
+                SLURM account if required to sbatch jobs.
+            slurm_extra_param:
+                SLURM extra parameter to be appended to sbatch command line.
             slurm_resource_param:
                 String of a set of resource parameters for the job submission engine.
                 WDL syntax allowed in ${} notation.
@@ -850,7 +958,7 @@ class CromwellBackendSlurm(CromwellBackendHpc):
 
         super().__init__(
             local_out_dir=local_out_dir,
-            backend_name=BACKEND_SLURM,
+            backend_name=BackendProvider.SLURM,
             max_concurrent_tasks=max_concurrent_tasks,
             soft_glob_output=soft_glob_output,
             local_hash_strat=local_hash_strat,
@@ -870,6 +978,8 @@ class CromwellBackendSlurm(CromwellBackendHpc):
 
 
 class CromwellBackendSge(CromwellBackendHpc):
+    """SGE backend configuration for Cromwell."""
+
     SGE_RUNTIME_ATTRIBUTES = dedent(
         """
         String? sge_pe
@@ -912,18 +1022,33 @@ class CromwellBackendSge(CromwellBackendHpc):
 
     def __init__(
         self,
-        local_out_dir,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        soft_glob_output=False,
-        local_hash_strat=CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
-        sge_pe=None,
-        sge_queue=None,
-        sge_extra_param=None,
-        sge_resource_param=DEFAULT_SGE_RESOURCE_PARAM,
-    ):
-        """SGE backend. Try qsubbing up to 3 times every 30 second.
+        local_out_dir: str,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        soft_glob_output: bool = False,
+        local_hash_strat: str = CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
+        sge_pe: str | None = None,
+        sge_queue: str | None = None,
+        sge_extra_param: str | None = None,
+        sge_resource_param: str = DEFAULT_SGE_RESOURCE_PARAM,
+    ) -> None:
+        """
+        SGE backend. Try qsubbing up to 3 times every 30 second.
 
         Args:
+            local_out_dir:
+                Output directory for local backends.
+            max_concurrent_tasks:
+                Limit for concurrent number of tasks.
+            soft_glob_output:
+                Glob with ln -s instead of hard-linking.
+            local_hash_strat:
+                Local file hashing strategy for call-caching.
+            sge_pe:
+                SGE parallel environment (required to run with multiple cpus).
+            sge_queue:
+                SGE queue.
+            sge_extra_param:
+                SGE extra parameter to be appended to qsub command line.
             sge_resource_param:
                 String of a set of resource parameters for the job submission engine.
                 WDL syntax allowed in ${} notation.
@@ -936,7 +1061,7 @@ class CromwellBackendSge(CromwellBackendHpc):
 
         super().__init__(
             local_out_dir=local_out_dir,
-            backend_name=BACKEND_SGE,
+            backend_name=BackendProvider.SGE,
             max_concurrent_tasks=max_concurrent_tasks,
             soft_glob_output=soft_glob_output,
             local_hash_strat=local_hash_strat,
@@ -956,6 +1081,8 @@ class CromwellBackendSge(CromwellBackendHpc):
 
 
 class CromwellBackendPbs(CromwellBackendHpc):
+    """PBS backend configuration for Cromwell."""
+
     PBS_RUNTIME_ATTRIBUTES = dedent(
         """
         String? pbs_queue
@@ -993,17 +1120,30 @@ class CromwellBackendPbs(CromwellBackendHpc):
 
     def __init__(
         self,
-        local_out_dir,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        soft_glob_output=False,
-        local_hash_strat=CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
-        pbs_queue=None,
-        pbs_extra_param=None,
-        pbs_resource_param=DEFAULT_PBS_RESOURCE_PARAM,
-    ):
-        """PBS backend. Try qsubbing up to 3 times every 30 second.
+        local_out_dir: str,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        soft_glob_output: bool = False,
+        local_hash_strat: str = CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
+        pbs_queue: str | None = None,
+        pbs_extra_param: str | None = None,
+        pbs_resource_param: str = DEFAULT_PBS_RESOURCE_PARAM,
+    ) -> None:
+        """
+        PBS backend. Try qsubbing up to 3 times every 30 second.
 
         Args:
+            local_out_dir:
+                Output directory for local backends.
+            max_concurrent_tasks:
+                Limit for concurrent number of tasks.
+            soft_glob_output:
+                Glob with ln -s instead of hard-linking.
+            local_hash_strat:
+                Local file hashing strategy for call-caching.
+            pbs_queue:
+                PBS queue.
+            pbs_extra_param:
+                PBS extra parameter to be appended to qsub command line.
             pbs_resource_param:
                 String of a set of resource parameters for the job submission engine.
                 WDL syntax allowed in ${} notation.
@@ -1016,7 +1156,7 @@ class CromwellBackendPbs(CromwellBackendHpc):
 
         super().__init__(
             local_out_dir=local_out_dir,
-            backend_name=BACKEND_PBS,
+            backend_name=BackendProvider.PBS,
             max_concurrent_tasks=max_concurrent_tasks,
             soft_glob_output=soft_glob_output,
             local_hash_strat=local_hash_strat,
@@ -1034,6 +1174,8 @@ class CromwellBackendPbs(CromwellBackendHpc):
 
 
 class CromwellBackendLsf(CromwellBackendHpc):
+    """LSF backend configuration for Cromwell."""
+
     LSF_RUNTIME_ATTRIBUTES = dedent(
         """
         String? lsf_queue
@@ -1072,22 +1214,35 @@ class CromwellBackendLsf(CromwellBackendHpc):
 
     def __init__(
         self,
-        local_out_dir,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        soft_glob_output=False,
-        local_hash_strat=CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
-        lsf_queue=None,
-        lsf_extra_param=None,
-        lsf_resource_param=DEFAULT_LSF_RESOURCE_PARAM,
-    ):
-        """LSF backend. Try bsubbing up to 3 times every 30 second.
+        local_out_dir: str,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        soft_glob_output: bool = False,
+        local_hash_strat: str = CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
+        lsf_queue: str | None = None,
+        lsf_extra_param: str | None = None,
+        lsf_resource_param: str = DEFAULT_LSF_RESOURCE_PARAM,
+    ) -> None:
+        """
+        LSF backend. Try bsubbing up to 3 times every 30 second.
 
         Args:
+            local_out_dir:
+                Output directory for local backends.
+            max_concurrent_tasks:
+                Limit for concurrent number of tasks.
+            soft_glob_output:
+                Glob with ln -s instead of hard-linking.
+            local_hash_strat:
+                Local file hashing strategy for call-caching.
+            lsf_queue:
+                LSF queue.
+            lsf_extra_param:
+                LSF extra parameter to be appended to bsub command line.
             lsf_resource_param:
                 String of a set of resource parameters for the job submission engine.
                 WDL syntax allowed in ${} notation.
                 This will be appended to the job sumbission command line.
-                e.g. qsub ... THIS_RESOURCE_PARAM
+                e.g. bsub ... THIS_RESOURCE_PARAM
         """
         submit = CromwellBackendLsf.TEMPLATE_LSF_SUBMIT.format(
             submit=CromwellBackendLocal.SUBMIT, lsf_resource_param=lsf_resource_param
@@ -1095,7 +1250,7 @@ class CromwellBackendLsf(CromwellBackendHpc):
 
         super().__init__(
             local_out_dir=local_out_dir,
-            backend_name=BACKEND_LSF,
+            backend_name=BackendProvider.LSF,
             max_concurrent_tasks=max_concurrent_tasks,
             soft_glob_output=soft_glob_output,
             local_hash_strat=local_hash_strat,

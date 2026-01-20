@@ -51,9 +51,7 @@ class ResourceAnalysisReductionMethod(Enum):
 
 def _add_common_args(parser: ArgumentParser) -> None:
     parser.add_argument('-c', '--conf', help='Specify config file', default=DEFAULT_CAPER_CONF)
-    parser.add_argument(
-        '-D', '--debug', action='store_true', help='Prints all logs >= DEBUG level'
-    )
+    parser.add_argument('-D', '--debug', action='store_true', help='Prints all logs >= DEBUG level')
     parser.add_argument(
         '--gcp-service-account-key-json',
         help='Secret key JSON file for Google Cloud Platform service account. '
@@ -100,16 +98,12 @@ def _add_backend_args(parser: ArgumentParser) -> None:
     parser.add_argument(
         '--dry-run',
         action='store_true',
-        help=(
-            'Caper localizes remote files and validates WDL but does not run/submit a pipeline.'
-        ),
+        help=('Caper localizes remote files and validates WDL but does not run/submit a pipeline.'),
     )
 
 
 def _add_gcp_zones_args(parser: ArgumentParser) -> None:
-    group_gc_all = parser.add_argument_group(
-        title='GCP backend arguments for server/runner/client'
-    )
+    group_gc_all = parser.add_argument_group(title='GCP backend arguments for server/runner/client')
     group_gc_all.add_argument(
         '--gcp-zones',
         help=(
@@ -229,7 +223,7 @@ def _add_cromwell_args(parser: ArgumentParser) -> None:
             '(CURRENTLY NOT WORKING) If an error caught by these comma-separated keys '
             'occurs, then increase memory by --memory-retry-multiplier for retrials '
             'controlled by --max-retries. '
-            'See https://cromwell.readthedocs.io/en/develop/cromwell_features/RetryWithMoreMemory/ '  # noqa: E501
+            'See https://cromwell.readthedocs.io/en/develop/cromwell_features/RetryWithMoreMemory/ '
             'for details.'
         ),
     )
@@ -431,7 +425,7 @@ def _add_submit_io_args(parser: ArgumentParser) -> None:
         help=(
             '(CURRENTLY NOT WORKING) If an error caught by --memory-retry-error-keys occurs, '
             'then increase memory by this for retrials controlled by --max-retries. '
-            'See https://cromwell.readthedocs.io/en/develop/cromwell_features/RetryWithMoreMemory/ '  # noqa: E501
+            'See https://cromwell.readthedocs.io/en/develop/cromwell_features/RetryWithMoreMemory/ '
             'for details.'
         ),
     )
@@ -444,7 +438,7 @@ def _add_submit_io_args(parser: ArgumentParser) -> None:
             'with gcp_profile, make this script generate a TSV with a header in the first row. '
             'The first column of such TSV will be ignored since it is usually timestamp. Check '
             'monitoring_script in '
-            'https://cromwell.readthedocs.io/en/stable/wf_options/Google/#google-pipelines-api-workflow-options '  # noqa: E501
+            'https://cromwell.readthedocs.io/en/stable/wf_options/Google/ '
             'for details.'
         ),
     )
@@ -562,21 +556,15 @@ def _add_scheduler_args(parser: ArgumentParser) -> None:
     group_sge = parser.add_argument_group('SGE arguments')
     group_sge.add_argument('--sge-pe', help='SGE parallel environment. Check with "qconf -spl"')
     group_sge.add_argument('--sge-queue', help='SGE queue. Check with "qconf -sql"')
-    group_sge.add_argument(
-        '--sge-extra-param', help='SGE extra parameters. Must be double-quoted'
-    )
+    group_sge.add_argument('--sge-extra-param', help='SGE extra parameters. Must be double-quoted')
 
     group_pbs = parser.add_argument_group('PBS arguments')
     group_pbs.add_argument('--pbs-queue', help='PBS queue')
-    group_pbs.add_argument(
-        '--pbs-extra-param', help='PBS extra parameters. Must be double-quoted'
-    )
+    group_pbs.add_argument('--pbs-extra-param', help='PBS extra parameters. Must be double-quoted')
 
     group_lsf = parser.add_argument_group('LSF arguments')
     group_lsf.add_argument('--lsf-queue', help='LSF queue')
-    group_lsf.add_argument(
-        '--lsf-extra-param', help='LSF extra parameters. Must be double-quoted'
-    )
+    group_lsf.add_argument('--lsf-extra-param', help='LSF extra parameters. Must be double-quoted')
 
 
 def _add_server_args(parser: ArgumentParser) -> None:
@@ -688,9 +676,7 @@ def _add_troubleshoot_args(parser: ArgumentParser) -> None:
         action='store_true',
         help='Show information about completed tasks.',
     )
-    parser.add_argument(
-        '--show-stdout', action='store_true', help='Show STDOUT for failed tasks.'
-    )
+    parser.add_argument('--show-stdout', action='store_true', help='Show STDOUT for failed tasks.')
 
 
 def _add_gcp_monitor_args(parser: ArgumentParser) -> None:
@@ -928,9 +914,7 @@ def get_parser_and_defaults(
             Such value is converted into a correct type guessed from
             defaults of arguments defined in ArgumentParser object.
     """
-    parser = argparse.ArgumentParser(
-        description='Caper (Cromwell-assisted Pipeline ExecutioneR)'
-    )
+    parser = argparse.ArgumentParser(description='Caper (Cromwell-assisted Pipeline ExecutioneR)')
     parser.add_argument('-v', '--version', action='store_true', help='Show version')
 
     subparser = parser.add_subparsers(dest='action')

@@ -1,3 +1,5 @@
+"""Caper - Cromwell Assisted Pipeline ExecutoR."""
+
 from .caper_client import CaperClient, CaperClientSubmit
 from .caper_runner import CaperRunner
 
