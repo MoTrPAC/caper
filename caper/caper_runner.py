@@ -2,6 +2,7 @@
 
 import logging
 import os
+from collections.abc import Callable
 from typing import TextIO
 
 from autouri import AbsPath, AutoURI
@@ -529,6 +530,8 @@ class CaperRunner(CaperBase):
         embed_subworkflow: bool = False,
         java_heap_server: str = Cromwell.DEFAULT_JAVA_HEAP_CROMWELL_SERVER,
         auto_write_metadata: bool = True,
+        on_server_start: Callable[[], None] | None = None,
+        on_status_change: Callable[..., None] | None = None,
         work_dir: str | None = None,
         dry_run: bool = False,
     ) -> NBSubprocThread | None:
@@ -596,5 +599,7 @@ class CaperRunner(CaperBase):
             embed_subworkflow=embed_subworkflow,
             java_heap_cromwell_server=java_heap_server,
             auto_write_metadata=auto_write_metadata,
+            on_server_start=on_server_start,
+            on_status_change=on_status_change,
             dry_run=dry_run,
         )
