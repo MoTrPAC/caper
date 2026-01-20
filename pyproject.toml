@@ -6,7 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 authors = [
-    { name = "Jin Lee", email = "leepc12@gmail.com" }
+    { name = "Jin Lee", email = "leepc12@gmail.com" },
+    { name = "Mihir Samdarshi", email = "msamdars@stanford.edu"}
 ]
 maintainers = [
     { name = "Mihir Samdarshi", email = "msamdars@stanford.edu"}
