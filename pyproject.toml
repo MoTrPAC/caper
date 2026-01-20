@@ -95,3 +95,6 @@ convention = "google"
 
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "single"
+
+[tool.pyright]
+pythonVersion = "3.12"
