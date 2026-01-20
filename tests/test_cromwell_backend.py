@@ -1,14 +1,15 @@
 """There are lots of UserDict-based classesi n caper/cromwell_backend.py
 In this test, only the followings classes with public methods
 will be tested.
-    - CromwellBackendBase
+    - CromwellBackendBase.
 
 """
+
 from caper.cromwell_backend import CromwellBackendBase
 
 
-def test_cromwell_backend_base_backend():
-    """Test a property backend's getter, setter"""
+def test_cromwell_backend_base_backend() -> None:
+    """Test a property backend's getter, setter."""
     bb1 = CromwellBackendBase('test1')
     backend_dict = {'a': 1, 'b': '2'}
 
@@ -16,7 +17,7 @@ def test_cromwell_backend_base_backend():
     assert bb1.backend == backend_dict
 
 
-def test_cromwell_backend_base_merge_backend():
+def test_cromwell_backend_base_merge_backend() -> None:
     bb1 = CromwellBackendBase('test1')
     bb1.backend = {'a': 1, 'b': '2'}
     backend_dict = {'c': 3.0, 'd': '4.0'}
@@ -25,13 +26,13 @@ def test_cromwell_backend_base_merge_backend():
     assert bb1.backend == {'a': 1, 'b': '2', 'c': 3.0, 'd': '4.0'}
 
 
-def test_cromwell_backend_base_backend_config():
+def test_cromwell_backend_base_backend_config() -> None:
     bb1 = CromwellBackendBase('test1')
     bb1.backend = {'config': {'root': 'test/folder'}}
     assert bb1.backend_config == {'root': 'test/folder'}
 
 
-def test_cromwell_backend_base_backend_config_dra():
+def test_cromwell_backend_base_backend_config_dra() -> None:
     bb1 = CromwellBackendBase('test1')
     bb1.backend = {
         'config': {

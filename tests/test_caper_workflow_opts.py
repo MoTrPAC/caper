@@ -5,10 +5,10 @@ from textwrap import dedent
 import pytest
 
 from caper.caper_workflow_opts import CaperWorkflowOpts
-from caper.cromwell_backend import BACKEND_AWS, BACKEND_GCP
+from caper.cromwell_backend import BackendProvider
 
 
-def test_create_file(tmp_path):
+def test_create_file(tmp_path) -> None:
     """Test without docker/singularity."""
     gcp_zones = ['us-west-1', 'us-west-2']
     slurm_partition = 'my_partition'
@@ -46,9 +46,7 @@ def test_create_file(tmp_path):
     custom_options = tmp_path / 'my_custom_options.json'
     custom_options_dict = {
         'backend': 'world',
-        CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES: {
-            'slurm_partition': 'not_my_partition'
-        },
+        CaperWorkflowOpts.DEFAULT_RUNTIME_ATTRIBUTES: {'slurm_partition': 'not_my_partition'},
     }
     custom_options.write_text(json.dumps(custom_options_dict, indent=4))
 
@@ -111,9 +109,8 @@ def test_create_file(tmp_path):
     assert d['monitoring_script'] == gcp_monitoring_script
 
 
-def test_create_file_google_cloud(tmp_path):
-    """Test with Batch. zones should be written to default_runtime_attributes.
-    """
+def test_create_file_google_cloud(tmp_path) -> None:
+    """Test with Batch. zones should be written to default_runtime_attributes."""
     gcp_zones = ['us-west-1', 'us-west-2']
 
     co = CaperWorkflowOpts(gcp_zones=gcp_zones)
@@ -130,7 +127,7 @@ def test_create_file_google_cloud(tmp_path):
     assert 'zones' in dra
 
 
-def test_create_file_docker(tmp_path):
+def test_create_file_docker(tmp_path) -> None:
     """Test with docker and docker defined in WDL."""
     wdl_contents = dedent(
         """\
@@ -152,7 +149,7 @@ def test_create_file_docker(tmp_path):
     f_gcp = co.create_file(
         directory=str(tmp_path),
         wdl=str(wdl),
-        backend=BACKEND_GCP,
+        backend=BackendProvider.GCP,
         basename='opts_gcp.json',
     )
     with open(f_gcp) as fp:
@@ -164,7 +161,7 @@ def test_create_file_docker(tmp_path):
     f_aws = co.create_file(
         directory=str(tmp_path),
         wdl=str(wdl),
-        backend=BACKEND_AWS,
+        backend=BackendProvider.AWS,
         basename='opts_aws.json',
     )
     with open(f_aws) as fp:
@@ -199,7 +196,7 @@ def test_create_file_docker(tmp_path):
     assert dra_local2['docker'] == 'ubuntu:16'
 
 
-def test_create_file_singularity(tmp_path):
+def test_create_file_singularity(tmp_path) -> None:
     """Test with singularity and singularity defined in WDL."""
     wdl_contents = dedent(
         """\
@@ -222,7 +219,7 @@ def test_create_file_singularity(tmp_path):
     f_gcp = co.create_file(
         directory=str(tmp_path),
         wdl=str(wdl),
-        backend=BACKEND_GCP,
+        backend=BackendProvider.GCP,
         basename='opts_gcp.json',
     )
     with open(f_gcp) as fp:
@@ -234,7 +231,7 @@ def test_create_file_singularity(tmp_path):
     f_aws = co.create_file(
         directory=str(tmp_path),
         wdl=str(wdl),
-        backend=BACKEND_AWS,
+        backend=BackendProvider.AWS,
         basename='opts_aws.json',
     )
     with open(f_aws) as fp:
@@ -247,7 +244,7 @@ def test_create_file_singularity(tmp_path):
         co.create_file(
             directory=str(tmp_path),
             wdl=str(wdl),
-            backend=BACKEND_GCP,
+            backend=BackendProvider.GCP,
             singularity='',
             basename='opts_gcp2.json',
         )
@@ -255,7 +252,7 @@ def test_create_file_singularity(tmp_path):
         co.create_file(
             directory=str(tmp_path),
             wdl=str(wdl),
-            backend=BACKEND_AWS,
+            backend=BackendProvider.AWS,
             singularity='',
             basename='opts_aws2.json',
         )

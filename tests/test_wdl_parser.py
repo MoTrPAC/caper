@@ -21,12 +21,12 @@ from .example_wdl import (
 )
 
 
-def test_properties(tmp_path):
+def test_properties(tmp_path) -> None:
     """Test the following properties.
     - contents
     - workflow_meta
     - workflow_parameter_meta
-    - imports
+    - imports.
     """
     wdl = tmp_path / 'main.wdl'
     wdl.write_text(MAIN_WDL)
@@ -38,7 +38,7 @@ def test_properties(tmp_path):
     assert wp.imports == ['sub/sub.wdl']
 
 
-def test_zip_subworkflows(tmp_path):
+def test_zip_subworkflows(tmp_path) -> None:
     """This actually tests create_imports_file since
     create_imports_file's merely a wrapper for zip_subworkflows.
     """

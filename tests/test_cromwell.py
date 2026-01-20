@@ -13,8 +13,10 @@ from .example_wdl import WRONG_WDL, make_directory_with_wdls
 
 BACKEND_CONF_CONTENTS = """
 backend {{
+  default = "Local"
   providers {{
     Local {{
+      actor-factory = "cromwell.backend.impl.sfs.config.ConfigBackendLifecycleActorFactory"
       config {{
         root = {root}
       }}
@@ -27,7 +29,7 @@ TIMEOUT_SERVER_SPIN_UP = 200
 TIMEOUT_SERVER_RUN_WORKFLOW = 960
 
 
-def test_validate(tmp_path, cromwell, womtool):
+def test_validate(tmp_path, cromwell, womtool) -> None:
     c = Cromwell(cromwell=cromwell, womtool=womtool)
 
     wdl = tmp_path / 'wrong.wdl'
@@ -52,7 +54,7 @@ def test_validate(tmp_path, cromwell, womtool):
 
 
 @pytest.mark.slow
-def test_run(tmp_path, cromwell, womtool):
+def test_run(tmp_path, cromwell, womtool) -> None:
     fileobj_stdout = sys.stdout
 
     c = Cromwell(cromwell=cromwell, womtool=womtool)
@@ -116,7 +118,7 @@ def test_run(tmp_path, cromwell, womtool):
 
 
 @pytest.mark.slow
-def test_server(tmp_path, cromwell, womtool):
+def test_server(tmp_path, cromwell, womtool) -> None:
     """Test Cromwell.server() method, which returns a Thread object."""
     server_port = 8005
     fileobj_stdout = sys.stdout
@@ -131,21 +133,20 @@ def test_server(tmp_path, cromwell, womtool):
 
     is_server_started = False
 
-    def on_server_start():
+    def on_server_start() -> None:
         nonlocal is_server_started
         is_server_started = True
 
     workflow_id = None
     is_workflow_done = False
 
-    def on_status_change(metadata):
+    def on_status_change(metadata) -> None:
         nonlocal workflow_id
         nonlocal is_workflow_done
 
-        if metadata:
-            if metadata['id'] == workflow_id:
-                if metadata['status'] in ('Succeeded', 'Failed'):
-                    is_workflow_done = True
+        if metadata and metadata['id'] == workflow_id:
+            if metadata['status'] in ('Succeeded', 'Failed'):
+                is_workflow_done = True
 
     # also tests two callback functions
     try:
@@ -165,7 +166,8 @@ def test_server(tmp_path, cromwell, womtool):
         while not is_server_started:
             time.sleep(1)
             if time.time() - t_start > TIMEOUT_SERVER_SPIN_UP:
-                raise TimeoutError('Timed out waiting for Cromwell server spin-up.')
+                msg = 'Timed out waiting for Cromwell server spin-up.'
+                raise TimeoutError(msg)
 
         # another way of checking server is started
         assert th.status
@@ -186,9 +188,9 @@ def test_server(tmp_path, cromwell, womtool):
         t_start = time.time()
         while not is_workflow_done:
             time.sleep(1)
-            print('polling: ', workflow_id, is_workflow_done)
             if time.time() - t_start > TIMEOUT_SERVER_RUN_WORKFLOW:
-                raise TimeoutError('Timed out waiting for workflow being done.')
+                msg = 'Timed out waiting for workflow being done.'
+                raise TimeoutError(msg)
 
         metadata = cra.get_metadata([workflow_id], embed_subworkflow=True)[0]
 
