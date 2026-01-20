@@ -1,3 +1,4 @@
+import platform
 import os
 import time
 
@@ -97,7 +98,14 @@ def test_nb_subproc_thread_nonzero_rc() -> None:
         assert th.returncode == rc
 
 
-@pytest.mark.parametrize(('test_app', 'expected_rc'), [('cat', 1), ('ls', 1), ('java', 1)])
+# ls on macOS/BSD returns 1 if the file does not exist, Linux returns 2.
+# Don't care about windows
+LS_RETURN_CODE = 1 if platform.system() == 'Darwin' else 2
+
+
+@pytest.mark.parametrize(
+    ('test_app', 'expected_rc'), [('cat', 1), ('ls', LS_RETURN_CODE), ('java', 1)]
+)
 def test_nb_subproc_thread_nonzero_rc_for_real_apps(test_app, expected_rc) -> None:
     test_str = 'asdfasf-10190212-zxcv'
     if os.path.exists(test_str):
