@@ -1,13 +1,16 @@
+"""Module for creating the Cromwell backend configuration file."""
+from __future__ import annotations
+
 import logging
 import os
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 from autouri import AutoURI
 
+from caper.cromwell_backend import BackendProvider, CachingDuplicationStrategyArgs
+
 from .cromwell_backend import (
-    BACKEND_AWS,
-    BACKEND_GCP,
-    BACKEND_SGE,
     CromwellBackendAws,
     CromwellBackendBase,
     CromwellBackendCommon,
@@ -22,62 +25,69 @@ from .cromwell_backend import (
 from .dict_tool import merge_dict
 from .hocon_string import HOCONString
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 logger = logging.getLogger(__name__)
 
 
 class CaperBackendConf:
+    """Class for creating the Cromwell backend configuration file."""
+
     BACKEND_CONF_INCLUDE = 'include required(classpath("application"))'
     BASENAME_BACKEND_CONF = 'backend.conf'
 
     def __init__(
         self,
-        default_backend,
-        local_out_dir,
-        disable_call_caching=False,
-        max_concurrent_workflows=CromwellBackendCommon.DEFAULT_MAX_CONCURRENT_WORKFLOWS,
-        memory_retry_error_keys=CromwellBackendCommon.DEFAULT_MEMORY_RETRY_ERROR_KEYS,
-        max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
-        soft_glob_output=False,
-        local_hash_strat=CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
-        db=CromwellBackendDatabase.DEFAULT_DB,
-        db_timeout=CromwellBackendDatabase.DEFAULT_DB_TIMEOUT_MS,
-        mysql_db_ip=CromwellBackendDatabase.DEFAULT_MYSQL_DB_IP,
-        mysql_db_port=CromwellBackendDatabase.DEFAULT_MYSQL_DB_PORT,
-        mysql_db_user=CromwellBackendDatabase.DEFAULT_MYSQL_DB_USER,
-        mysql_db_password=CromwellBackendDatabase.DEFAULT_MYSQL_DB_PASSWORD,
-        mysql_db_name=CromwellBackendDatabase.DEFAULT_MYSQL_DB_NAME,
-        postgresql_db_ip=CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_IP,
-        postgresql_db_port=CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_PORT,
-        postgresql_db_user=CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_USER,
-        postgresql_db_password=CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_PASSWORD,
-        postgresql_db_name=CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_NAME,
-        file_db=None,
-        gcp_prj=None,
-        gcp_out_dir=None,
-        gcp_call_caching_dup_strat=CromwellBackendGcp.DEFAULT_CALL_CACHING_DUP_STRAT,
-        gcp_service_account_key_json=None,
-        gcp_compute_service_account=None,
-        gcp_region=CromwellBackendGcp.DEFAULT_REGION,
-        aws_batch_arn=None,
-        aws_region=None,
-        aws_out_dir=None,
-        aws_call_caching_dup_strat=CromwellBackendAws.DEFAULT_CALL_CACHING_DUP_STRAT,
-        slurm_partition=None,
-        slurm_account=None,
-        slurm_extra_param=None,
-        slurm_resource_param=CromwellBackendSlurm.DEFAULT_SLURM_RESOURCE_PARAM,
-        sge_pe=None,
-        sge_queue=None,
-        sge_extra_param=None,
-        sge_resource_param=CromwellBackendSge.DEFAULT_SGE_RESOURCE_PARAM,
-        pbs_queue=None,
-        pbs_extra_param=None,
-        pbs_resource_param=CromwellBackendPbs.DEFAULT_PBS_RESOURCE_PARAM,
-        lsf_queue=None,
-        lsf_extra_param=None,
-        lsf_resource_param=CromwellBackendLsf.DEFAULT_LSF_RESOURCE_PARAM,
-    ):
-        """Initializes the backend conf's stanzas.
+        default_backend: BackendProvider,
+        local_out_dir: str,
+        disable_call_caching: bool = False,
+        max_concurrent_workflows: int = CromwellBackendCommon.DEFAULT_MAX_CONCURRENT_WORKFLOWS,
+        memory_retry_error_keys: Sequence[str]
+        | None = CromwellBackendCommon.DEFAULT_MEMORY_RETRY_ERROR_KEYS,
+        max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
+        soft_glob_output: bool = False,
+        local_hash_strat: str = CromwellBackendLocal.DEFAULT_LOCAL_HASH_STRAT,
+        db: str = CromwellBackendDatabase.DEFAULT_DB,
+        db_timeout: int = CromwellBackendDatabase.DEFAULT_DB_TIMEOUT_MS,
+        mysql_db_ip: str = CromwellBackendDatabase.DEFAULT_MYSQL_DB_IP,
+        mysql_db_port: int = CromwellBackendDatabase.DEFAULT_MYSQL_DB_PORT,
+        mysql_db_user: str = CromwellBackendDatabase.DEFAULT_MYSQL_DB_USER,
+        mysql_db_password: str = CromwellBackendDatabase.DEFAULT_MYSQL_DB_PASSWORD,
+        mysql_db_name: str = CromwellBackendDatabase.DEFAULT_MYSQL_DB_NAME,
+        postgresql_db_ip: str = CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_IP,
+        postgresql_db_port: int = CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_PORT,
+        postgresql_db_user: str = CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_USER,
+        postgresql_db_password: str = CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_PASSWORD,
+        postgresql_db_name: str = CromwellBackendDatabase.DEFAULT_POSTGRESQL_DB_NAME,
+        file_db: str | None = None,
+        gcp_prj: str | None = None,
+        gcp_out_dir: str | None = None,
+        gcp_call_caching_dup_strat: CachingDuplicationStrategyArgs = CromwellBackendGcp.DEFAULT_CALL_CACHING_DUP_STRAT,
+        gcp_service_account_key_json: str | None = None,
+        gcp_compute_service_account: str | None = None,
+        gcp_region: str = CromwellBackendGcp.DEFAULT_REGION,
+        aws_batch_arn: str | None = None,
+        aws_region: str | None = None,
+        aws_out_dir: str | None = None,
+        aws_call_caching_dup_strat: CachingDuplicationStrategyArgs = CromwellBackendAws.DEFAULT_CALL_CACHING_DUP_STRAT,
+        slurm_partition: str | None = None,
+        slurm_account: str | None = None,
+        slurm_extra_param: str | None = None,
+        slurm_resource_param: str = CromwellBackendSlurm.DEFAULT_SLURM_RESOURCE_PARAM,
+        sge_pe: str | None = None,
+        sge_queue: str | None = None,
+        sge_extra_param: str | None = None,
+        sge_resource_param: str = CromwellBackendSge.DEFAULT_SGE_RESOURCE_PARAM,
+        pbs_queue: str | None = None,
+        pbs_extra_param: str | None = None,
+        pbs_resource_param: str = CromwellBackendPbs.DEFAULT_PBS_RESOURCE_PARAM,
+        lsf_queue: str | None = None,
+        lsf_extra_param: str | None = None,
+        lsf_resource_param: str = CromwellBackendLsf.DEFAULT_LSF_RESOURCE_PARAM,
+    ) -> None:
+        """
+        Initializes the backend conf's stanzas.
 
         Args:
             default_backend:
@@ -99,7 +109,7 @@ class CaperBackendConf:
             max_concurrent_tasks:
                 Limit for concurrent number of tasks for each workflow.
             soft_glob_output:
-                Local backends only (Local, sge, pbs, slurm, lsf).
+                Local backends only (local, sge, pbs, slurm, lsf).
                 Glob with ln -s instead of hard-linking (ln alone).
                 Useful for file-system like beeGFS, which does not allow hard-linking.
             local_hash_strat:
@@ -142,9 +152,10 @@ class CaperBackendConf:
             gcp_service_account_key_json:
                 GCP service account key JSON.
             gcp_compute_service_account:
-                The email of the GCP service account email to use for the Batch compute instances.
-                If not provided, the default Compute Engine service account will be used.
-                Ensure that this service account has the `roles/batch.agentReporter` role, so that 
+                The email of the GCP service account email to use for the
+                Batch compute instances. If not provided, the default Compute
+                Engine service account will be used. Ensure that this service
+                account has the `roles/batch.agentReporter` role, so that
                 VM instances can report their status to Batch.
             gcp_region:
                 Region for Google Cloud Batch API.
@@ -157,23 +168,36 @@ class CaperBackendConf:
             aws_call_caching_dup_strat:
                 Call-caching duplication strategy for AWS backend.
             slurm_partition:
+                SLURM partition if required to sbatch jobs.
             slurm_account:
+                SLURM account if required to sbatch jobs.
             slurm_extra_param:
+                SLURM extra parameter to be appended to sbatch command line.
             slurm_resource_param:
                 For slurm backend only.
                 Resource parameters to be passed to sbatch.
                 You can use WDL syntax and Cromwell's built-in variables in ${} notation.
                 e.g. cpu, time, memory_mb
             sge_pe:
+                SGE parallel environment (required to run with multiple cpus).
             sge_queue:
+                SGE queue.
             sge_extra_param:
+                SGE extra parameter to be appended to qsub command line.
             sge_resource_param:
+                SGE resource parameters to be passed to qsub.
             pbs_queue:
+                PBS queue.
             pbs_extra_param:
+                PBS extra parameter to be appended to qsub command line.
             pbs_resource_param:
+                PBS resource parameters to be passed to qsub.
             lsf_queue:
+                LSF queue.
             lsf_extra_param:
+                LSF extra parameter to be appended to bsub command line.
             lsf_resource_param:
+                LSF resource parameters to be passed to bsub.
         """
         self._template = {}
 
@@ -274,15 +298,13 @@ class CaperBackendConf:
         # cloud backends
         if gcp_prj and gcp_out_dir:
             if gcp_service_account_key_json:
-                gcp_service_account_key_json = os.path.expanduser(
-                    gcp_service_account_key_json
-                )
+                gcp_service_account_key_json = os.path.expanduser(gcp_service_account_key_json)
                 if not os.path.exists(gcp_service_account_key_json):
-                    raise FileNotFoundError(
-                        'gcp_service_account_key_json does not exist. f={f}'.format(
-                            f=gcp_service_account_key_json
-                        )
+                    msg = (
+                        f'gcp_service_account_key_json does not exist. '
+                        f'f={gcp_service_account_key_json}'
                     )
+                    raise FileNotFoundError(msg)
 
             merge_dict(
                 self._template,
@@ -320,14 +342,17 @@ class CaperBackendConf:
 
     def create_file(
         self,
-        directory,
-        backend=None,
-        custom_backend_conf=None,
-        basename=BASENAME_BACKEND_CONF,
-    ):
-        """Create a HOCON string and create a backend.conf file.
+        directory: str,
+        backend: BackendProvider | None = None,
+        custom_backend_conf: str | None = None,
+        basename: str = BASENAME_BACKEND_CONF,
+    ) -> str:
+        """
+        Create a HOCON string and create a backend.conf file.
 
         Args:
+            directory:
+                Directory to create a backend.conf file.
             backend:
                 Backend to run a workflow on.
                 Default backend will be use if not defined.
@@ -339,41 +364,31 @@ class CaperBackendConf:
         """
         template = deepcopy(self._template)
 
-        if backend == BACKEND_SGE:
+        if backend == BackendProvider.SGE:
             if self._sge_pe is None:
-                raise ValueError(
-                    'sge-pe (Sun GridEngine parallel environment) '
-                    'is required for backend sge.'
+                msg = (
+                    'sge-pe (Sun GridEngine parallel environment) is required for backend sge.'
                 )
-        elif backend == BACKEND_GCP:
+                raise ValueError(msg)
+        elif backend == BackendProvider.GCP:
             if self._gcp_prj is None:
-                raise ValueError(
-                    'gcp-prj (Google Cloud Platform project) '
-                    'is required for backend gcp.'
-                )
+                msg = 'gcp-prj (Google Cloud Platform project) is required for backend gcp.'
+                raise ValueError(msg)
             if self._gcp_out_dir is None:
-                raise ValueError(
-                    'gcp-out-dir (gs:// output bucket path) '
-                    'is required for backend gcp.'
-                )
-        elif backend == BACKEND_AWS:
+                msg = 'gcp-out-dir (gs:// output bucket path) is required for backend gcp.'
+                raise ValueError(msg)
+        elif backend == BackendProvider.AWS:
             if self._aws_batch_arn is None:
-                raise ValueError(
-                    'aws-batch-arn (ARN for AWS Batch) ' 'is required for backend aws.'
-                )
+                msg = 'aws-batch-arn (ARN for AWS Batch) is required for backend aws.'
+                raise ValueError(msg)
             if self._aws_region is None:
-                raise ValueError(
-                    'aws-region (AWS region) ' 'is required for backend aws.'
-                )
+                msg = 'aws-region (AWS region) is required for backend aws.'
+                raise ValueError(msg)
             if self._aws_out_dir is None:
-                raise ValueError(
-                    'aws-out-dir (s3:// output bucket path) '
-                    'is required for backend aws.'
-                )
+                msg = 'aws-out-dir (s3:// output bucket path) is required for backend aws.'
+                raise ValueError(msg)
 
-        hocon_s = HOCONString.from_dict(
-            template, include=CaperBackendConf.BACKEND_CONF_INCLUDE
-        )
+        hocon_s = HOCONString.from_dict(template, include=CaperBackendConf.BACKEND_CONF_INCLUDE)
 
         if custom_backend_conf is not None:
             s = AutoURI(custom_backend_conf).read()

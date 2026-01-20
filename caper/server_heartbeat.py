@@ -131,9 +131,7 @@ class ServerHeartbeat:
                 logger.debug('Writing heartbeat: %s, %s', hostname, port)
                 AutoURI(self._heartbeat_file).write(f'{hostname}:{port}')
             except OSError:
-                logger.exception(
-                    'Failed to write to a heartbeat_file. %s', self._heartbeat_file
-                )
+                logger.exception('Failed to write to a heartbeat_file. %s', self._heartbeat_file)
             cnt = 0
             while cnt < self._interval_update_heartbeat:
                 cnt += 1

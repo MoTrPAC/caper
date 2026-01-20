@@ -1,16 +1,9 @@
+"""Initialize Caper configuration files for different backends."""
+
 import os
 
 from .cromwell import Cromwell
-from .cromwell_backend import (
-    BACKEND_ALIAS_LOCAL,
-    BACKEND_AWS,
-    BACKEND_GCP,
-    BACKEND_LOCAL,
-    BACKEND_LSF,
-    BACKEND_PBS,
-    BACKEND_SGE,
-    BACKEND_SLURM,
-)
+from .cromwell_backend import BackendProvider
 
 CONF_CONTENTS_TMP_DIR = """
 # Local directory for localized files and Cromwell's intermediate files.
@@ -25,15 +18,15 @@ CONF_CONTENTS_COMMON_RESOURCE_PARAM_HELP = """
 # It is not recommended to change it unless your cluster has custom resource settings.
 # See https://github.com/ENCODE-DCC/caper/blob/master/docs/resource_param.md for details."""
 
-CONF_CONTENTS_SLURM_PARAM = ""
+CONF_CONTENTS_SLURM_PARAM = ''
 CONF_CONTENTS_SGE_PARAM = """
 # Parallel environment of SGE:
 # Find one with `$ qconf -spl` or ask you admin to add one if not exists.
 sge-pe=
 """
 
-CONF_CONTENTS_PBS_PARAM = ""
-CONF_CONTENTS_LSF_PARAM = ""
+CONF_CONTENTS_PBS_PARAM = ''
+CONF_CONTENTS_LSF_PARAM = ''
 
 DEFAULT_CONF_CONTENTS_LOCAL = (
     """backend=local
@@ -124,29 +117,31 @@ max-retries=1
 )
 
 
-def init_caper_conf(conf_file, backend):
+def init_caper_conf(conf_file: str, backend: BackendProvider) -> None:
     """Initialize conf file for a given backend.
+
     There are two special backend aliases for two Stanford clusters.
     These clusters are based on SLURM.
     Also, download/install Cromwell/Womtool JARs, whose
     default URL and install dir are defined in class Cromwell.
     """
-    if backend in (BACKEND_LOCAL, BACKEND_ALIAS_LOCAL):
+    if backend == BackendProvider.LOCAL:
         contents = DEFAULT_CONF_CONTENTS_LOCAL
-    elif backend == BACKEND_SLURM:
+    elif backend == BackendProvider.SLURM:
         contents = DEFAULT_CONF_CONTENTS_SLURM
-    elif backend == BACKEND_SGE:
+    elif backend == BackendProvider.SGE:
         contents = DEFAULT_CONF_CONTENTS_SGE
-    elif backend == BACKEND_PBS:
+    elif backend == BackendProvider.PBS:
         contents = DEFAULT_CONF_CONTENTS_PBS
-    elif backend == BACKEND_LSF:
+    elif backend == BackendProvider.LSF:
         contents = DEFAULT_CONF_CONTENTS_LSF
-    elif backend in BACKEND_GCP:
+    elif backend == BackendProvider.GCP:
         contents = DEFAULT_CONF_CONTENTS_GCP
-    elif backend in BACKEND_AWS:
+    elif backend == BackendProvider.AWS:
         contents = DEFAULT_CONF_CONTENTS_AWS
     else:
-        raise ValueError('Unsupported backend {p}'.format(p=backend))
+        msg = f'Unsupported backend {backend}'
+        raise ValueError(msg)
 
     conf_file = os.path.expanduser(conf_file)
     os.makedirs(os.path.dirname(conf_file), exist_ok=True)
@@ -155,7 +150,5 @@ def init_caper_conf(conf_file, backend):
         fp.write(contents + '\n')
 
         cromwell = Cromwell()
-        fp.write(
-            '{key}={val}\n'.format(key='cromwell', val=cromwell.install_cromwell())
-        )
+        fp.write('{key}={val}\n'.format(key='cromwell', val=cromwell.install_cromwell()))
         fp.write('{key}={val}\n'.format(key='womtool', val=cromwell.install_womtool()))

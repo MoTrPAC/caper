@@ -132,7 +132,7 @@ def split_dict[W: Mapping[str, Any]](d: W, rules: list[tuple[str, str]] | None =
     Args:
         d:
             Dictionary/Mapping to split.
-        rule:
+        rules:
             A list of tuple (RULE_NAME: REGEX)
 
             If a key name in an JSON object matches with this REGEX

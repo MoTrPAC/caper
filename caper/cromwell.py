@@ -1,34 +1,42 @@
+"""Cromwell server and JAR management."""
+
 import json
 import logging
 import os
 import shutil
 import socket
 import tempfile
+from collections.abc import Callable
+from pathlib import Path
+from typing import TextIO
 
 from autouri import AbsPath, AutoURI
 
-from .cromwell_metadata import CromwellMetadata
-from .cromwell_workflow_monitor import CromwellWorkflowMonitor
-from .nb_subproc_thread import NBSubprocThread, is_fileobj_open
+from caper.cromwell_metadata import CromwellMetadata
+from caper.cromwell_workflow_monitor import CromwellWorkflowMonitor
+from caper.nb_subproc_thread import NBSubprocThread, is_fileobj_open
+from caper.server_heartbeat import ServerHeartbeat
 
 logger = logging.getLogger(__name__)
 
 
 class PortAlreadyInUseError(Exception):
-    pass
+    """Exception raised when a port is already in use."""
 
 
-class WomtoolValidationFailed(Exception):
-    pass
+class WomtoolValidationFailed(Exception):  # noqa: N818
+    """Exception raised when Womtool validation fails."""
 
 
-def install_file(f, install_dir, label):
-    """Install f locally on install_dir.
+def install_file(f: AutoURI | str, install_dir: str, label: str) -> AutoURI:
+    """
+    Install f locally on install_dir.
+
     If f is already local then skip it.
     """
     if AbsPath(f).is_valid:
         return AbsPath(f).uri
-    logger.info('Installing {label}... {f}'.format(label=label, f=f))
+    logger.info('Installing %s... %s', label, f)
     path = os.path.join(os.path.expanduser(install_dir), AutoURI(f).basename)
     return AutoURI(f).cp(path)
 
@@ -53,12 +61,14 @@ class Cromwell:
 
     def __init__(
         self,
-        cromwell=DEFAULT_CROMWELL,
-        womtool=DEFAULT_WOMTOOL,
-        cromwell_install_dir=DEFAULT_CROMWELL_INSTALL_DIR,
-        womtool_install_dir=DEFAULT_WOMTOOL_INSTALL_DIR,
-    ):
+        cromwell: AutoURI | str = DEFAULT_CROMWELL,
+        womtool: AutoURI | str = DEFAULT_WOMTOOL,
+        cromwell_install_dir: str = DEFAULT_CROMWELL_INSTALL_DIR,
+        womtool_install_dir: str = DEFAULT_WOMTOOL_INSTALL_DIR,
+    ) -> None:
         """
+        Initializes the Cromwell class, which handles the main Cromwell/Womtool operations.
+
         Args:
             cromwell:
                 Cromwell JAR path/URI/URL.
@@ -73,28 +83,25 @@ class Cromwell:
         self._womtool = womtool
 
         if not AbsPath(cromwell_install_dir).is_valid:
-            raise ValueError(
-                'crommwell_install_dir is not a valid absolute '
-                'path. {path}'.format(path=cromwell_install_dir)
-            )
+            msg = f'crommwell_install_dir is not a valid absolute path. {cromwell_install_dir}'
+            raise ValueError(msg)
         self._cromwell_install_dir = cromwell_install_dir
 
         if not AbsPath(womtool_install_dir).is_valid:
-            raise ValueError(
-                'womtool_install_dir is not a valid absolute '
-                'path. {path}'.format(path=womtool_install_dir)
-            )
+            msg = f'womtool_install_dir is not a valid absolute path. {womtool_install_dir}'
+            raise ValueError(msg)
         self._womtool_install_dir = womtool_install_dir
 
     def validate(
         self,
-        wdl,
-        inputs=None,
-        imports=None,
-        cwd=None,
-        java_heap_womtool=DEFAULT_JAVA_HEAP_WOMTOOL,
-    ):
-        """Validate WDL/inputs/imports using Womtool.
+        wdl: AutoURI | str,
+        inputs: AutoURI | str | None = None,
+        imports: Path | str | None = None,
+        cwd: str | None = None,
+        java_heap_womtool: str = DEFAULT_JAVA_HEAP_WOMTOOL,
+    ) -> None:
+        """
+        Validate WDL/inputs/imports using Womtool.
 
         Returns:
             valid:
@@ -104,23 +111,17 @@ class Cromwell:
 
         wdl_file = AutoURI(wdl)
         if not wdl_file.exists:
-            raise FileNotFoundError(
-                'WDL file does not exist. wdl={wdl}'.format(wdl=wdl)
-            )
-        if inputs:
-            if not AutoURI(inputs).exists:
-                raise FileNotFoundError(
-                    'Inputs JSON defined but does not exist. i={i}'.format(i=inputs)
-                )
+            msg = f'WDL file does not exist. wdl={wdl}'
+            raise FileNotFoundError(msg)
+        if inputs and not AutoURI(inputs).exists:
+            msg = f'Inputs JSON defined but does not exist. i={inputs}'
+            raise FileNotFoundError(msg)
 
         with tempfile.TemporaryDirectory() as tmp_d:
             if imports:
                 if not AutoURI(imports).exists:
-                    raise FileNotFoundError(
-                        'Imports file defined but does not exist. i={i}'.format(
-                            i=imports
-                        )
-                    )
+                    msg = f'Imports file defined but does not exist. i={imports}'
+                    raise FileNotFoundError(msg)
                 wdl_ = os.path.join(tmp_d, wdl_file.basename)
                 wdl_file.cp(wdl_)
                 shutil.unpack_archive(imports, tmp_d)
@@ -129,7 +130,7 @@ class Cromwell:
 
             cmd = [
                 'java',
-                '-Xmx{heap}'.format(heap=java_heap_womtool),
+                f'-Xmx{java_heap_womtool}',
                 '-jar',
                 '-DLOG_LEVEL={lvl}'.format(lvl='INFO'),
                 self._womtool,
@@ -143,49 +144,48 @@ class Cromwell:
 
             stderr = ''
 
-            def on_stderr(s):
+            def on_stderr(s: str) -> None:
                 nonlocal stderr
                 stderr += s
 
-            th = NBSubprocThread(cmd, cwd=tmp_d, on_stderr=on_stderr, quiet=False)
+            th = NBSubprocThread([str(s) for s in cmd], cwd=tmp_d, on_stderr=on_stderr, quiet=False)
             th.start()
             th.join()
 
             if th.returncode:
                 if th.returncode == 127:
-                    raise FileNotFoundError(
+                    msg = (
                         'Java executable not found on your system? '
                         'Please install Java and try again.'
                     )
-                else:
-                    raise WomtoolValidationFailed(
-                        'RC={rc}\nSTDERR={stderr}'.format(
-                            rc=th.returncode, stderr=stderr
-                        )
-                    )
+                    raise FileNotFoundError(msg)
+                msg = f'RC={th.returncode}\nSTDERR={stderr}'
+                raise WomtoolValidationFailed(msg)
 
             logger.info('Passed Womtool validation.')
 
     def run(
         self,
-        wdl,
-        inputs=None,
-        options=None,
-        imports=None,
-        labels=None,
-        metadata=None,
-        backend_conf=None,
-        backend=None,
-        fileobj_stdout=None,
-        fileobj_troubleshoot=None,
-        java_heap_cromwell_run=DEFAULT_JAVA_HEAP_CROMWELL_RUN,
-        java_heap_womtool=DEFAULT_JAVA_HEAP_WOMTOOL,
-        work_dir=None,
-        cwd=None,
-        on_status_change=None,
-        dry_run=False,
-    ):
-        """Run Cromwell run mode (java -jar cromwell.jar run).
+        wdl: str,
+        inputs: str | None = None,
+        options: str | None = None,
+        imports: str | None = None,
+        labels: str | None = None,
+        metadata: str | None = None,
+        backend_conf: str | None = None,
+        backend: str | None = None,
+        fileobj_stdout: TextIO | None = None,
+        fileobj_troubleshoot: TextIO | None = None,
+        java_heap_cromwell_run: str = DEFAULT_JAVA_HEAP_CROMWELL_RUN,
+        java_heap_womtool: str = DEFAULT_JAVA_HEAP_WOMTOOL,
+        work_dir: str | None = None,
+        cwd: str | None = None,
+        on_status_change: Callable[..., None] | None = None,
+        dry_run: bool = False,
+    ) -> NBSubprocThread | None:
+        """
+        Run Cromwell run mode (java -jar cromwell.jar run).
+
         This is a non-blocking function which returns a NBSubprocThread object.
         So this function itself doesn't return anything.
         However, its NBSubprocThread object has a return value which is validated
@@ -194,6 +194,8 @@ class Cromwell:
         You can simply get it by thread.returnvalue after thread is done.
 
         Args:
+            wdl:
+                WDL file to run.
             inputs:
                 input JSON file (-i).
             options:
@@ -207,6 +209,10 @@ class Cromwell:
             backend_conf:
                 backend.conf file (-Dconfig.file=).
                 Default backend defined in this file will be used.
+            backend:
+                Backend to run a workflow on.
+            java_heap_womtool:
+                Java heap (java -Xmx) for Womtool.
                 If no default backend is defined then "Local" (Cromwell's default)
                 backend will be used.
             fileobj_stdout:
@@ -240,10 +246,12 @@ class Cromwell:
                         metadata (dict) of a workflow.
             dry_run:
                 Dry run.
+
         Returns:
             th:
                 Thread for Cromwell's run mode. None if dry_run.
-                Notes:
+
+        Notes:
                     Thread's return value (th.returnvalue)
                     is Cromwell's output metadata dict.
                     It is None if Cromwell subprocess itself didn't run,
@@ -257,7 +265,7 @@ class Cromwell:
         # LOG_LEVEL must be >=INFO to catch workflow ID from STDOUT
         cmd = [
             'java',
-            '-Xmx{}'.format(java_heap_cromwell_run),
+            f'-Xmx{java_heap_cromwell_run}',
             '-XX:ParallelGCThreads=1',
             '-jar',
             '-DLOG_LEVEL={lvl}'.format(lvl='INFO'),
@@ -265,7 +273,7 @@ class Cromwell:
         ]
 
         if backend_conf:
-            cmd += ['-Dconfig.file={}'.format(backend_conf)]
+            cmd += [f'-Dconfig.file={backend_conf}']
         cmd += [self._cromwell, 'run', wdl]
         if inputs:
             cmd += ['-i', inputs]
@@ -276,18 +284,16 @@ class Cromwell:
         if imports:
             cmd += ['-p', imports]
         if metadata is None:
-            metadata = os.path.join(
-                work_dir, CromwellMetadata.DEFAULT_METADATA_BASENAME
-            )
+            metadata = os.path.join(work_dir, CromwellMetadata.DEFAULT_METADATA_BASENAME)
         cmd += ['-m', metadata]
 
-        logger.debug('cmd: {cmd}'.format(cmd=' '.join(cmd)))
+        logger.debug('cmd: %s', ' '.join(str(s) for s in cmd))
         if dry_run:
-            return
+            return None
 
         wm = CromwellWorkflowMonitor(on_status_change=on_status_change, is_server=False)
 
-        def on_stdout(stdout):
+        def on_stdout(stdout: str) -> None:
             nonlocal wm
             nonlocal fileobj_stdout
 
@@ -296,7 +302,7 @@ class Cromwell:
                 fileobj_stdout.flush()
             wm.update(stdout)
 
-        def on_finish():
+        def on_finish() -> dict | None:
             nonlocal metadata
             nonlocal fileobj_troubleshoot
 
@@ -314,6 +320,7 @@ class Cromwell:
 
                     # to make it a return value of the thread after it is done (joined)
                     return metadata_dict
+            return None
 
         th = NBSubprocThread(
             cmd,
@@ -328,20 +335,22 @@ class Cromwell:
 
     def server(
         self,
-        server_port=DEFAULT_SERVER_PORT,
-        server_hostname=None,
-        server_heartbeat=None,
-        backend_conf=None,
-        fileobj_stdout=None,
-        embed_subworkflow=False,
-        java_heap_cromwell_server=DEFAULT_JAVA_HEAP_CROMWELL_SERVER,
-        auto_write_metadata=True,
-        on_server_start=None,
-        on_status_change=None,
-        cwd=None,
-        dry_run=False,
-    ):
-        """Run Cromwell server mode (java -jar cromwell.jar server).
+        server_port: int = DEFAULT_SERVER_PORT,
+        server_hostname: str | None = None,
+        server_heartbeat: ServerHeartbeat | None = None,
+        backend_conf: str | None = None,
+        fileobj_stdout: TextIO | None = None,
+        embed_subworkflow: bool = False,
+        java_heap_cromwell_server: str = DEFAULT_JAVA_HEAP_CROMWELL_SERVER,
+        auto_write_metadata: bool = True,
+        on_server_start: Callable[[], None] | None = None,
+        on_status_change: Callable[..., None] | None = None,
+        cwd: str | None = None,
+        dry_run: bool = False,
+    ) -> NBSubprocThread | None:
+        """
+        Run Cromwell server mode (java -jar cromwell.jar server).
+
         This is a non-blocking function that returns a Thread object of Cromwell server.
         Howerver, this Thread object has a property status that indicates whether
         the server is started and ready to take submissions.
@@ -396,6 +405,7 @@ class Cromwell:
                 This will be finally passed to subprocess.Popen(cwd=).
             dry_run:
                 Dry run.
+
         Returns:
             th:
                 Thread for Cromwell's server mode.
@@ -407,32 +417,28 @@ class Cromwell:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex((Cromwell.LOCALHOST, server_port))
         if not result:
-            raise PortAlreadyInUseError(
-                'Server port {p} is already taken. '
-                'Try with a different port'.format(p=server_port)
-            )
+            msg = f'Server port {server_port} is already taken. Try with a different port'
+            raise PortAlreadyInUseError(msg)
 
         # LOG_LEVEL must be >=INFO to catch workflow ID from STDOUT
         cmd = [
             'java',
-            '-Xmx{}'.format(java_heap_cromwell_server),
+            f'-Xmx{java_heap_cromwell_server}',
             '-XX:ParallelGCThreads=1',
             '-jar',
-            '-DLOG_LEVEL={lvl}'.format(lvl='INFO'),
+            '-DLOG_LEVEL=INFO',
             '-DLOG_MODE=standard',
-            '-Dwebservice.port={port}'.format(port=server_port),
+            f'-Dwebservice.port={server_port}',
         ]
         if backend_conf:
-            cmd += ['-Dconfig.file={}'.format(backend_conf)]
-            logger.debug(
-                'backend_conf contents:\n{s}'.format(s=AutoURI(backend_conf).read())
-            )
+            cmd += [f'-Dconfig.file={backend_conf}']
+            logger.debug('backend_conf contents:\n%s', AutoURI(backend_conf).read())
 
         cmd += [self._cromwell, 'server']
 
-        logger.debug('cmd: {cmd}'.format(cmd=' '.join(cmd)))
+        logger.debug('cmd: %s', ' '.join(cmd))
         if dry_run:
-            return
+            return None
 
         wm = CromwellWorkflowMonitor(
             server_port=server_port,
@@ -443,8 +449,10 @@ class Cromwell:
             on_status_change=on_status_change,
         )
 
-        def on_stdout(stdout):
-            """Returns 'server_started' when server is ready to take submissions.
+        def on_stdout(stdout: str) -> str | None:
+            """
+            Returns 'server_started' when server is ready to take submissions.
+
             Return value of this callback function is to update .status
             of an NBSubprocThread object.
             """
@@ -461,8 +469,9 @@ class Cromwell:
                 if server_heartbeat and not server_heartbeat.is_alive():
                     server_heartbeat.start(port=server_port, hostname=server_hostname)
                 return 'server_started'
+            return None
 
-        def on_finish():
+        def on_finish() -> None:
             nonlocal server_heartbeat
 
             if server_heartbeat:
@@ -479,14 +488,10 @@ class Cromwell:
 
         return th
 
-    def install_cromwell(self):
-        self._cromwell = install_file(
-            self._cromwell, self._cromwell_install_dir, 'Cromwell JAR'
-        )
+    def install_cromwell(self) -> str:
+        self._cromwell = install_file(self._cromwell, self._cromwell_install_dir, 'Cromwell JAR')
         return self._cromwell
 
-    def install_womtool(self):
-        self._womtool = install_file(
-            self._womtool, self._womtool_install_dir, 'Womtool JAR'
-        )
+    def install_womtool(self) -> str:
+        self._womtool = install_file(self._womtool, self._womtool_install_dir, 'Womtool JAR')
         return self._womtool
