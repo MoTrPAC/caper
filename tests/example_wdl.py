@@ -10,6 +10,7 @@ these WDLs have the following structure:
                 sub_sub.wdl (imports nothing)
         inputs.json (inputs JSON file)
 """
+
 import json
 import os
 from textwrap import dedent
@@ -155,10 +156,9 @@ SUB_SUB_WDL = dedent(
 )
 
 
-def make_directory_with_wdls(directory, no_sub_wdl=False):
+def make_directory_with_wdls(directory, no_sub_wdl=False) -> None:
     """
-    Run Cromwell with WDLs:
-    main + 1 sub + 1 sub's sub.
+    Run Cromwell with WDLs: main + 1 sub + 1 sub's sub.
 
     Returns:
         Created root directory
@@ -177,10 +177,9 @@ def make_directory_with_wdls(directory, no_sub_wdl=False):
         AutoURI(sub_sub_wdl).write(SUB_SUB_WDL)
 
 
-def make_directory_with_failing_wdls(directory, no_sub_wdl=False):
+def make_directory_with_failing_wdls(directory, no_sub_wdl=False) -> None:
     """
-    Run Cromwell with WDLs:
-    main + 1 sub (supposed to fail) + 1 sub's sub.
+    Run Cromwell with WDLs: main + 1 sub (supposed to fail) + 1 sub's sub.
 
     Returns:
         Created root directory

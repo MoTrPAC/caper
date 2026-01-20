@@ -1,6 +1,7 @@
 """This does not cover all CLI parameters defined in caper/caper_args.py.
 gcp (Google Cloud Platform) backend is tested here with server/client functions.
 """
+
 import os
 import time
 
@@ -30,8 +31,8 @@ def test_server_client(
     gcp_service_account_key_json,
     gcp_compute_service_account,
     debug_caper,
-):
-    """Test server, client stuffs"""
+) -> None:
+    """Test server, client stuffs."""
     # server command line
     server_port = 8015
 
@@ -63,7 +64,6 @@ def test_server_client(
     cmd += ['--port', str(server_port)]
     if debug_caper:
         cmd += ['--debug']
-    print(' '.join(cmd))
 
     try:
         th = cli_main(cmd, nonblocking_server=True)
@@ -73,7 +73,8 @@ def test_server_client(
         while th.status is None:
             time.sleep(1)
             if time.time() - t_start > TIMEOUT_SERVER_SPIN_UP:
-                raise TimeoutError('Timed out waiting for Cromwell server spin-up.')
+                msg = 'Timed out waiting for Cromwell server spin-up.'
+                raise TimeoutError(msg)
 
         # prepare WDLs and input JSON, imports to be submitted
         make_directory_with_wdls(str(tmp_path))
@@ -129,7 +130,6 @@ def test_server_client(
                 metadata_json_file = os.path.join(workflow_root, 'metadata.json')
             else:
                 metadata_json_file = None
-            print('polling: ', workflow_id, m['status'], metadata_json_file)
 
             if m['status'] in ('Failed', 'Succeeded'):
                 if AutoURI(metadata_json_file).exists:
@@ -138,7 +138,8 @@ def test_server_client(
                 assert not AutoURI(metadata_json_file).exists
 
             if time.time() - t_start > TIMEOUT_SERVER_RUN_WORKFLOW:
-                raise TimeoutError('Timed out waiting for workflow being done.')
+                msg = 'Timed out waiting for workflow being done.'
+                raise TimeoutError(msg)
 
     finally:
         # all done. so stop the server

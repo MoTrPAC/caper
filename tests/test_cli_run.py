@@ -8,6 +8,7 @@ See test_cli_server_client.py for 'caper server/submit/...'.
 We will use gcp (Google Cloud Platform) backend to test server-client
 functions.
 """
+
 import json
 import os
 
@@ -21,7 +22,7 @@ from caper.wdl_parser import WDLParser
 from .example_wdl import make_directory_with_wdls
 
 
-def test_wrong_subcmd():
+def test_wrong_subcmd() -> None:
     cmd = ['wrong_subcmd']
     with pytest.raises(SystemExit):
         cli_main(cmd)
@@ -38,17 +39,17 @@ def test_wrong_subcmd():
         ['--docker', 'ubuntu:latest', '--soft-glob-output'],
     ],
 )
-def test_mutually_exclusive_params(tmp_path, cmd):
+def test_mutually_exclusive_params(tmp_path, cmd) -> None:
     make_directory_with_wdls(str(tmp_path))
 
-    cmd = ['run', str(tmp_path / 'main.wdl')] + cmd
+    cmd = ['run', str(tmp_path / 'main.wdl'), *cmd]
     with pytest.raises(ValueError):
         cli_main(cmd)
 
 
 @pytest.mark.slow
 @pytest.mark.integration
-def test_run(tmp_path, cromwell, womtool, debug_caper):
+def test_run(tmp_path, cromwell, womtool, debug_caper) -> None:
     """Will test most local parameters (run only) here."""
     make_directory_with_wdls(str(tmp_path))
     wdl = tmp_path / 'main.wdl'
@@ -94,7 +95,8 @@ def test_run(tmp_path, cromwell, womtool, debug_caper):
     cm = CromwellMetadata(str(tmp_path / 'metadata.json'))
     # check if metadata JSON and workflowRoot dir exists
     root_out_dir = cm.data['workflowRoot']
-    assert os.path.exists(root_out_dir) and os.path.isdir(root_out_dir)
+    assert os.path.exists(root_out_dir)
+    assert os.path.isdir(root_out_dir)
 
     # dry-run should not delete anything
     cm.cleanup(dry_run=True)
@@ -117,8 +119,8 @@ def test_run_gcp_batch_api(
     gcp_service_account_key_json,
     gcp_compute_service_account,
     debug_caper,
-):
-    """Test run with Google Cloud Batch API"""
+) -> None:
+    """Test run with Google Cloud Batch API."""
     out_gcs_bucket = os.path.join(gcs_root, 'caper_out', ci_prefix)
     tmp_gcs_bucket = os.path.join(gcs_root, 'caper_tmp')
 
@@ -159,7 +161,6 @@ def test_run_gcp_batch_api(
     cmd += ['--docker', 'ubuntu:latest']
     if debug_caper:
         cmd += ['--debug']
-    print(' '.join(cmd))
 
     cli_main(cmd)
     m_dict = json.loads(metadata.read_text())

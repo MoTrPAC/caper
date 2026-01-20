@@ -1,6 +1,6 @@
 """Test is based on a metadata JSON file generated from
 running atac-seq-pipeline v1.8.0 with the following input JSON.
-gs://encode-pipeline-test-samples/encode-atac-seq-pipeline/ENCSR356KRQ_subsampled_caper.json
+gs://encode-pipeline-test-samples/encode-atac-seq-pipeline/ENCSR356KRQ_subsampled_caper.json.
 """
 
 import pytest
@@ -8,14 +8,14 @@ import pytest
 from caper.resource_analysis import LinearResourceAnalysis, ResourceAnalysis
 
 
-def test_resource_analysis_abstract_class(gcp_res_analysis_metadata):
+def test_resource_analysis_abstract_class(gcp_res_analysis_metadata) -> None:
     with pytest.raises(TypeError):
         # abstract base-class
         ResourceAnalysis()
 
 
 @pytest.mark.google_cloud
-def test_resource_analysis_analyze_task(gcp_res_analysis_metadata):
+def test_resource_analysis_analyze_task(gcp_res_analysis_metadata) -> None:
     analysis = LinearResourceAnalysis()
     analysis.collect_resource_data([gcp_res_analysis_metadata])
 
@@ -33,15 +33,9 @@ def test_resource_analysis_analyze_task(gcp_res_analysis_metadata):
     assert result_align1['coeffs']['stats.mean.cpu_pct'][0][0] == pytest.approx(
         1.6844513715565233e-06
     )
-    assert result_align1['coeffs']['stats.mean.cpu_pct'][1] == pytest.approx(
-        42.28561239506905
-    )
-    assert result_align1['coeffs']['stats.max.mem'][0][0] == pytest.approx(
-        48.91222341236991
-    )
-    assert result_align1['coeffs']['stats.max.mem'][1] == pytest.approx(
-        124314029.09791338
-    )
+    assert result_align1['coeffs']['stats.mean.cpu_pct'][1] == pytest.approx(42.28561239506905)
+    assert result_align1['coeffs']['stats.max.mem'][0][0] == pytest.approx(48.91222341236991)
+    assert result_align1['coeffs']['stats.max.mem'][1] == pytest.approx(124314029.09791338)
 
     result_align2 = analysis.analyze_task(
         'atac.align', in_file_vars=['fastqs_R2'], reduce_in_file_vars=sum
@@ -64,7 +58,7 @@ def test_resource_analysis_analyze_task(gcp_res_analysis_metadata):
 
 
 @pytest.mark.google_cloud
-def test_resource_analysis_analyze(gcp_res_analysis_metadata):
+def test_resource_analysis_analyze(gcp_res_analysis_metadata) -> None:
     """Test method analyze() which analyze all tasks defined in in_file_vars."""
     analysis = LinearResourceAnalysis()
     analysis.collect_resource_data([gcp_res_analysis_metadata])
@@ -79,9 +73,7 @@ def test_resource_analysis_analyze(gcp_res_analysis_metadata):
     assert result['atac.align*']['x'] == {
         'sum(fastqs_R1,fastqs_R2)': [32138224, 39148587, 32138224, 39148587]
     }
-    assert result['atac.filter*']['x'] == {
-        'sum(bam)': [61315022, 76789196, 61315022, 76789196]
-    }
+    assert result['atac.filter*']['x'] == {'sum(bam)': [61315022, 76789196, 61315022, 76789196]}
 
     result_all = analysis.analyze()
     # 38 tasks in total
