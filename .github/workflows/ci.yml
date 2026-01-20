@@ -1,0 +1,141 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  # Unit tests - runs on every push/PR
+  # Excludes Google Cloud tests
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.12"
+          - "3.13"
+          - "3.14"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            tzdata default-jre
+
+      - name: Install Singularity 4
+        env:
+          SINGULARITY_VERSION: 4.3.7
+        run: |
+          UBUNTU_CODENAME=$(lsb_release -cs)
+          wget -q "https://github.com/sylabs/singularity/releases/download/v${SINGULARITY_VERSION}/singularity-ce_${SINGULARITY_VERSION}-${UBUNTU_CODENAME}_amd64.deb"
+          sudo apt-get install -y "./singularity-ce_${SINGULARITY_VERSION}-${UBUNTU_CODENAME}_amd64.deb"
+          singularity --version
+
+      - name: Install dependencies
+        run: uv sync --all-groups --all-extras
+
+      - name: Run unit tests (excluding Google Cloud tests)
+        run: uv run pytest -m "not google_cloud and not slow" -vv -s --junit-xml=report.xml
+
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: success() || failure()    # run this step even if previous step failed
+        with:
+          name: Google Cloud Integration Test Results
+          path: report.xml    # Path to test results
+          reporter: java-junit        # Format of test results
+
+  # Google Cloud integration tests
+  # Requires maintainer approval via environment
+  gcp-integration-tests:
+    name: Google Cloud Integration Tests (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs:
+      - unit-tests
+    # This environment requires maintainer approval
+    # Configured at: Settings > Environments > google-cloud > Required reviewers
+    environment: Google Cloud
+
+    # Required for Workload Identity Federation
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # See the action's README for more details on how/why Workload Identity Federation is configured and used
+      # The principalSet:// has direct access to the --gcs-root bucket
+      # https://docs.cloud.google.com/iam/docs/workload-identity-federation#access_management
+      # access to the service account is configured via the MoTrPAC/motrpac-iac repo
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account: ${{ secrets.GCP_ACTIONS_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            tzdata default-jre
+
+      - name: Install Singularity 4
+        env:
+          SINGULARITY_VERSION: 4.3.7
+        run: |
+          UBUNTU_CODENAME=$(lsb_release -cs)
+          wget -q "https://github.com/sylabs/singularity/releases/download/v${SINGULARITY_VERSION}/singularity-ce_${SINGULARITY_VERSION}-${UBUNTU_CODENAME}_amd64.deb"
+          sudo apt-get install -y "./singularity-ce_${SINGULARITY_VERSION}-${UBUNTU_CODENAME}_amd64.deb"
+          singularity --version
+
+      - name: Install dependencies
+        run: uv sync --all-groups --all-extras
+
+      - name: Run Google Cloud integration tests
+        timeout-minutes: 60
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          uv run pytest -m "google_cloud" \
+            --ci-prefix ${{ github.run_id }} \
+            --gcs-root gs://motrpac-test-caper \
+            --debug-caper \
+            -vv -s --junit-xml=report.xml
+        
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: success() || failure()    # run this step even if previous step failed
+        with:
+          name: Google Cloud Integration Test Results
+          path: report.xml    # Path to test results
+          reporter: java-junit        # Format of test results
