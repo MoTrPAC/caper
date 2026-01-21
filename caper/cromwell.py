@@ -44,11 +44,14 @@ def install_file(f: AutoURI | str, install_dir: str, label: str) -> AutoURI:
 class Cromwell:
     """Wraps Cromwell/Womtool."""
 
+    DEFAULT_CROMWELL_VERSION = '91'
     DEFAULT_CROMWELL = (
-        'https://github.com/broadinstitute/cromwell/releases/download/90/cromwell-90.jar'
+        'https://github.com/broadinstitute/cromwell/releases/download/'
+        f'{DEFAULT_CROMWELL_VERSION}/cromwell-{DEFAULT_CROMWELL_VERSION}.jar'
     )
     DEFAULT_WOMTOOL = (
-        'https://github.com/broadinstitute/cromwell/releases/download/90/womtool-90.jar'
+        'https://github.com/broadinstitute/cromwell/releases/download/'
+        f'{DEFAULT_CROMWELL_VERSION}/womtool-{DEFAULT_CROMWELL_VERSION}.jar'
     )
     DEFAULT_CROMWELL_INSTALL_DIR = '~/.caper/cromwell_jar'
     DEFAULT_WOMTOOL_INSTALL_DIR = '~/.caper/womtool_jar'
