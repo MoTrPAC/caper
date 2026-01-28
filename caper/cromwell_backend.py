@@ -362,6 +362,8 @@ class CromwellBackendGcp(CromwellBackendBase):
     LOGGING_POLICY_GOOGLE_CLOUD_STORAGE = 'PATH'
     LOGGING_POLICY_GOOGLE_CLOUD_LOGGING = 'LOGGING'
 
+    DEFAULT_DOCKERHUB_MIRROR_ADDRESS = 'mirror.gcr.io'
+
     def __init__(
         self,
         gcp_prj: str,
@@ -370,6 +372,8 @@ class CromwellBackendGcp(CromwellBackendBase):
         gcp_compute_service_account: str | None = None,
         gcp_network: str | None = None,
         gcp_subnetwork: str | None = None,
+        gcp_dockerhub_mirror: bool = True,
+        gcp_dockerhub_mirror_address: str = DEFAULT_DOCKERHUB_MIRROR_ADDRESS,
         gcp_region: str = DEFAULT_REGION,
         gcp_logging_policy: str = LOGGING_POLICY_GOOGLE_CLOUD_STORAGE,
         max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
@@ -394,6 +398,10 @@ class CromwellBackendGcp(CromwellBackendBase):
                 VPC network name for GCP Batch backend. Required for VPCs in custom subnet mode.
             gcp_subnetwork:
                 VPC subnetwork name for GCP Batch backend. Required for VPCs in custom subnet mode.
+            gcp_dockerhub_mirror:
+                Enable Docker Hub mirroring through Google Artifact Registry.
+            gcp_dockerhub_mirror_address:
+                Address of the Docker Hub mirror (default: mirror.gcr.io).
             gcp_region:
                 Region for Google Cloud Batch API.
             gcp_logging_policy:
@@ -471,6 +479,15 @@ class CromwellBackendGcp(CromwellBackendBase):
             if gcp_subnetwork:
                 vpc_config['subnetwork-name'] = gcp_subnetwork
             config['virtual-private-cloud'] = vpc_config
+
+        # Docker Hub mirroring configuration
+        if gcp_dockerhub_mirror:
+            config['docker-mirror'] = {
+                'dockerhub': {
+                    'enabled': True,
+                    'address': gcp_dockerhub_mirror_address,
+                }
+            }
 
         self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
 

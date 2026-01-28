@@ -339,6 +339,21 @@ def _add_gcp_runner_args(parser: ArgumentParser) -> None:
             'Can be short name (e.g. "my-subnet") or regional path.'
         ),
     )
+    group_gc.add_argument(
+        '--gcp-dockerhub-mirror',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            'Enable Docker Hub mirroring through Google Artifact Registry (default: enabled). '
+            'Images will be pulled from mirror.gcr.io instead of Docker Hub directly. '
+            'Use --no-gcp-dockerhub-mirror to disable.'
+        ),
+    )
+    group_gc.add_argument(
+        '--gcp-dockerhub-mirror-address',
+        default='mirror.gcr.io',
+        help='Address of the Docker Hub mirror (default: mirror.gcr.io).',
+    )
 
 
 def _add_aws_runner_args(parser: ArgumentParser) -> None:

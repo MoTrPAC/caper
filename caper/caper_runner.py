@@ -82,6 +82,8 @@ class CaperRunner(CaperBase):
         gcp_compute_service_account: str | None = None,
         gcp_network: str | None = None,
         gcp_subnetwork: str | None = None,
+        gcp_dockerhub_mirror: bool = True,
+        gcp_dockerhub_mirror_address: str = 'mirror.gcr.io',
         gcp_region: str = CromwellBackendGcp.DEFAULT_REGION,
         aws_batch_arn: str | None = None,
         aws_region: str | None = None,
@@ -178,6 +180,10 @@ class CaperRunner(CaperBase):
                 VPC network name for GCP Batch backend. Required for VPCs in custom subnet mode.
             gcp_subnetwork:
                 VPC subnetwork name for GCP Batch backend. Required for VPCs in custom subnet mode.
+            gcp_dockerhub_mirror:
+                Enable Docker Hub mirroring through Google Artifact Registry.
+            gcp_dockerhub_mirror_address:
+                Address of the Docker Hub mirror (default: mirror.gcr.io).
             gcp_region:
                 Region for Google Cloud Batch API.
             aws_batch_arn:
@@ -262,6 +268,8 @@ class CaperRunner(CaperBase):
             gcp_compute_service_account=gcp_compute_service_account,
             gcp_network=gcp_network,
             gcp_subnetwork=gcp_subnetwork,
+            gcp_dockerhub_mirror=gcp_dockerhub_mirror,
+            gcp_dockerhub_mirror_address=gcp_dockerhub_mirror_address,
             gcp_region=gcp_region,
             aws_batch_arn=aws_batch_arn,
             aws_region=aws_region,

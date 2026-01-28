@@ -99,3 +99,61 @@ def test_cromwell_backend_gcp_without_network_config() -> None:
     )
     config = gcp.backend_config
     assert 'virtual-private-cloud' not in config
+
+
+def test_cromwell_backend_gcp_with_dockerhub_mirror() -> None:
+    """Test GCP backend with Docker Hub mirroring enabled."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+        gcp_dockerhub_mirror=True,
+    )
+    config = gcp.backend_config
+    assert 'docker-mirror' in config
+    assert config['docker-mirror']['dockerhub']['enabled'] is True
+    assert config['docker-mirror']['dockerhub']['address'] == 'mirror.gcr.io'
+
+
+def test_cromwell_backend_gcp_with_dockerhub_mirror_custom_address() -> None:
+    """Test GCP backend with Docker Hub mirroring and custom address."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+        gcp_dockerhub_mirror=True,
+        gcp_dockerhub_mirror_address='custom-mirror.example.com',
+    )
+    config = gcp.backend_config
+    assert 'docker-mirror' in config
+    assert config['docker-mirror']['dockerhub']['enabled'] is True
+    assert config['docker-mirror']['dockerhub']['address'] == 'custom-mirror.example.com'
+
+
+def test_cromwell_backend_gcp_without_dockerhub_mirror() -> None:
+    """Test GCP backend with Docker Hub mirroring explicitly disabled."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+        gcp_dockerhub_mirror=False,
+    )
+    config = gcp.backend_config
+    assert 'docker-mirror' not in config
+
+
+def test_cromwell_backend_gcp_default_has_dockerhub_mirror() -> None:
+    """Test GCP backend has Docker Hub mirroring enabled by default."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+    )
+    config = gcp.backend_config
+    assert 'docker-mirror' in config
+    assert config['docker-mirror']['dockerhub']['enabled'] is True
+    assert config['docker-mirror']['dockerhub']['address'] == 'mirror.gcr.io'
