@@ -325,6 +325,20 @@ def _add_gcp_runner_args(parser: ArgumentParser) -> None:
         '--out-gcs-bucket',
         help='Output directory path for GCP backend. e.g. gs://my-bucket/my-output.',
     )
+    group_gc.add_argument(
+        '--gcp-network',
+        help=(
+            'VPC network name for GCP Batch backend. Required for VPCs in custom subnet mode. '
+            'Can be short name (e.g. "my-vpc") or full path.'
+        ),
+    )
+    group_gc.add_argument(
+        '--gcp-subnetwork',
+        help=(
+            'VPC subnetwork name for GCP Batch backend. Required for VPCs in custom subnet mode. '
+            'Can be short name (e.g. "my-subnet") or regional path.'
+        ),
+    )
 
 
 def _add_aws_runner_args(parser: ArgumentParser) -> None:
