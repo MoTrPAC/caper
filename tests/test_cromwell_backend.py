@@ -41,3 +41,61 @@ def test_cromwell_backend_base_backend_config_dra() -> None:
         }
     }
     assert bb1.default_runtime_attributes == {'docker': 'ubuntu:latest'}
+
+
+def test_cromwell_backend_gcp_with_network_and_subnetwork() -> None:
+    """Test GCP backend with network and subnetwork specified."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+        gcp_network='my-vpc',
+        gcp_subnetwork='my-subnet',
+    )
+    config = gcp.backend_config
+    assert 'virtual-private-cloud' in config
+    assert config['virtual-private-cloud']['network-name'] == 'my-vpc'
+    assert config['virtual-private-cloud']['subnetwork-name'] == 'my-subnet'
+
+
+def test_cromwell_backend_gcp_with_network_only() -> None:
+    """Test GCP backend with only network specified."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+        gcp_network='my-vpc',
+    )
+    config = gcp.backend_config
+    assert 'virtual-private-cloud' in config
+    assert config['virtual-private-cloud']['network-name'] == 'my-vpc'
+    assert 'subnetwork-name' not in config['virtual-private-cloud']
+
+
+def test_cromwell_backend_gcp_with_subnetwork_only() -> None:
+    """Test GCP backend with only subnetwork specified."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+        gcp_subnetwork='my-subnet',
+    )
+    config = gcp.backend_config
+    assert 'virtual-private-cloud' in config
+    assert config['virtual-private-cloud']['subnetwork-name'] == 'my-subnet'
+    assert 'network-name' not in config['virtual-private-cloud']
+
+
+def test_cromwell_backend_gcp_without_network_config() -> None:
+    """Test GCP backend without network configuration (default behavior)."""
+    from caper.cromwell_backend import CromwellBackendGcp
+
+    gcp = CromwellBackendGcp(
+        gcp_prj='test-project',
+        gcp_out_dir='gs://test-bucket/output',
+    )
+    config = gcp.backend_config
+    assert 'virtual-private-cloud' not in config

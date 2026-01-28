@@ -368,6 +368,8 @@ class CromwellBackendGcp(CromwellBackendBase):
         gcp_out_dir: str,
         gcp_service_account_key_json: str | None = None,
         gcp_compute_service_account: str | None = None,
+        gcp_network: str | None = None,
+        gcp_subnetwork: str | None = None,
         gcp_region: str = DEFAULT_REGION,
         gcp_logging_policy: str = LOGGING_POLICY_GOOGLE_CLOUD_STORAGE,
         max_concurrent_tasks: int = CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
@@ -388,6 +390,10 @@ class CromwellBackendGcp(CromwellBackendBase):
                 defaults to the project's compute engine service account. Ensure that
                 this service account has the `roles/batch.agentReporter` role, so that
                 VM instances can report their status to Batch.
+            gcp_network:
+                VPC network name for GCP Batch backend. Required for VPCs in custom subnet mode.
+            gcp_subnetwork:
+                VPC subnetwork name for GCP Batch backend. Required for VPCs in custom subnet mode.
             gcp_region:
                 Region for Google Cloud Batch API.
             gcp_logging_policy:
@@ -456,6 +462,15 @@ class CromwellBackendGcp(CromwellBackendBase):
         # If service account email is provided, use it for compute-service-account
         if gcp_compute_service_account:
             batch['compute-service-account'] = gcp_compute_service_account
+
+        # Virtual Private Cloud configuration for custom subnet mode VPCs
+        if gcp_network or gcp_subnetwork:
+            vpc_config: dict[str, str] = {}
+            if gcp_network:
+                vpc_config['network-name'] = gcp_network
+            if gcp_subnetwork:
+                vpc_config['subnetwork-name'] = gcp_subnetwork
+            config['virtual-private-cloud'] = vpc_config
 
         self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
 

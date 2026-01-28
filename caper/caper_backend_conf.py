@@ -66,6 +66,8 @@ class CaperBackendConf:
         gcp_call_caching_dup_strat: CachingDuplicationStrategyArgs = CromwellBackendGcp.DEFAULT_CALL_CACHING_DUP_STRAT,
         gcp_service_account_key_json: str | None = None,
         gcp_compute_service_account: str | None = None,
+        gcp_network: str | None = None,
+        gcp_subnetwork: str | None = None,
         gcp_region: str = CromwellBackendGcp.DEFAULT_REGION,
         aws_batch_arn: str | None = None,
         aws_region: str | None = None,
@@ -157,6 +159,10 @@ class CaperBackendConf:
                 Engine service account will be used. Ensure that this service
                 account has the `roles/batch.agentReporter` role, so that
                 VM instances can report their status to Batch.
+            gcp_network:
+                VPC network name for GCP Batch backend. Required for VPCs in custom subnet mode.
+            gcp_subnetwork:
+                VPC subnetwork name for GCP Batch backend. Required for VPCs in custom subnet mode.
             gcp_region:
                 Region for Google Cloud Batch API.
             aws_batch_arn:
@@ -315,6 +321,8 @@ class CaperBackendConf:
                     call_caching_dup_strat=gcp_call_caching_dup_strat,
                     gcp_service_account_key_json=gcp_service_account_key_json,
                     gcp_compute_service_account=gcp_compute_service_account,
+                    gcp_network=gcp_network,
+                    gcp_subnetwork=gcp_subnetwork,
                     gcp_region=gcp_region,
                 ),
             )
