@@ -348,7 +348,6 @@ class CromwellBackendGcp(CromwellBackendBase):
         'config': {
             'default-runtime-attributes': {},
             'maximum-polling-interval': 600,
-            'localization-attempts': 3,
             'batch': {},
         }
     }
@@ -448,7 +447,6 @@ class CromwellBackendGcp(CromwellBackendBase):
 
         if gcp_service_account_key_json:
             auth_name = 'service-account'
-            config['auth'] = auth_name
             batch['auth'] = auth_name
             filesystems[FILESYSTEM_GCS]['auth'] = auth_name
             self['google']['auths'] = [
@@ -461,7 +459,6 @@ class CromwellBackendGcp(CromwellBackendBase):
             self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = auth_name
         else:
             auth_name = 'application-default'
-            config['auth'] = auth_name
             batch['auth'] = auth_name
             filesystems[FILESYSTEM_GCS]['auth'] = auth_name
             self['google']['auths'] = [{'name': auth_name, 'scheme': 'application_default'}]
