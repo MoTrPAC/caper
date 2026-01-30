@@ -519,6 +519,7 @@ def subcmd_metadata(caper_client: CaperClient, args: Namespace) -> None:
     if len(m) > 1:
         msg = 'Found multiple workflow matching with search query.'
         raise ValueError(msg)
+    print(json.dumps(m[0], indent=4))  # noqa: T201
 
 
 def get_single_cromwell_metadata_obj(
