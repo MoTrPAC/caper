@@ -8,7 +8,7 @@ import socket
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
-from typing import TextIO
+from typing import TextIO, overload, Literal
 
 from autouri import AbsPath, AutoURI
 
@@ -30,9 +30,9 @@ class WomtoolValidationFailed(Exception):  # noqa: N818
 
 def install_file(f: AutoURI | str, install_dir: str, label: str) -> AutoURI:
     """
-    Install f locally on install_dir.
+    Install file locally on install_dir.
 
-    If f is already local then skip it.
+    If file is already local then skip it.
     """
     if AbsPath(f).is_valid:
         return AbsPath(f).uri
@@ -100,7 +100,6 @@ class Cromwell:
         wdl: AutoURI | str,
         inputs: AutoURI | str | None = None,
         imports: Path | str | None = None,
-        cwd: str | None = None,
         java_heap_womtool: str = DEFAULT_JAVA_HEAP_WOMTOOL,
     ) -> None:
         """
@@ -176,7 +175,6 @@ class Cromwell:
         labels: str | None = None,
         metadata: str | None = None,
         backend_conf: str | None = None,
-        backend: str | None = None,
         fileobj_stdout: TextIO | None = None,
         fileobj_troubleshoot: TextIO | None = None,
         java_heap_cromwell_run: str = DEFAULT_JAVA_HEAP_CROMWELL_RUN,
@@ -212,12 +210,10 @@ class Cromwell:
             backend_conf:
                 backend.conf file (-Dconfig.file=).
                 Default backend defined in this file will be used.
-            backend:
-                Backend to run a workflow on.
-            java_heap_womtool:
-                Java heap (java -Xmx) for Womtool.
                 If no default backend is defined then "Local" (Cromwell's default)
                 backend will be used.
+            java_heap_womtool:
+                Java heap (java -Xmx) for Womtool.
             fileobj_stdout:
                 File-like object to print Cromwell's STDOUT.
             fileobj_troubleshoot:
@@ -491,10 +487,10 @@ class Cromwell:
 
         return th
 
-    def install_cromwell(self) -> str:
+    def install_cromwell(self) -> AutoURI:
         self._cromwell = install_file(self._cromwell, self._cromwell_install_dir, 'Cromwell JAR')
         return self._cromwell
 
-    def install_womtool(self) -> str:
+    def install_womtool(self) -> AutoURI:
         self._womtool = install_file(self._womtool, self._womtool_install_dir, 'Womtool JAR')
         return self._womtool

@@ -519,7 +519,7 @@ class CaperRunner(CaperBase):
         )
 
         if not ignore_womtool:
-            self._cromwell.validate(wdl=wdl, inputs=inputs, imports=imports)
+            self._cromwell.validate(wdl=wdl, inputs=inputs, imports=imports, java_heap_womtool=java_heap_womtool)
 
         logger.info('launching run: wdl=%s, inputs=%s, backend_conf=%s', wdl, inputs, backend_conf)
         return self._cromwell.run(
@@ -533,6 +533,8 @@ class CaperRunner(CaperBase):
             fileobj_stdout=fileobj_stdout,
             fileobj_troubleshoot=fileobj_troubleshoot,
             dry_run=dry_run,
+            java_heap_cromwell_run=java_heap_run,
+            java_heap_womtool=java_heap_womtool,
         )
 
     def server(
