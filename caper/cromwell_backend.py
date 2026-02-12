@@ -295,24 +295,14 @@ class CromwellBackendGcp(CromwellBackendBase):
     TEMPLATE_BACKEND = {
         'config': {
             'default-runtime-attributes': {},
-            'genomics-api-queries-per-100-seconds': 1000,
             'maximum-polling-interval': 600,
-            'localization-attempts': 3,
-            'genomics': {
-                'restrict-metadata-access': False,
-                'compute-service-account': 'default',
-            },
         }
     }
-    ACTOR_FACTORY_V2ALPHA = (
-        'cromwell.backend.google.pipelines.v2alpha1.PipelinesApiLifecycleActorFactory'
+    ACTOR_FACTORY_BATCH = (
+        'cromwell.backend.google.batch.GcpBatchBackendLifecycleActorFactory'
     )
-    ACTOR_FACTORY_V2BETA = (
-        'cromwell.backend.google.pipelines.v2beta.PipelinesApiLifecycleActorFactory'
-    )
-    GENOMICS_ENDPOINT_V2ALPHA = 'https://genomics.googleapis.com/'
-    GENOMICS_ENDPOINT_V2BETA = 'https://lifesciences.googleapis.com/'
     DEFAULT_REGION = 'us-central1'
+    DEFAULT_PARALLEL_COMPOSITE_UPLOAD_THRESHOLD = '150M'
     DEFAULT_CALL_CACHING_DUP_STRAT = CALL_CACHING_DUP_STRAT_REFERENCE
 
     def __init__(
@@ -320,25 +310,23 @@ class CromwellBackendGcp(CromwellBackendBase):
         gcp_prj,
         gcp_out_dir,
         gcp_service_account_key_json=None,
-        use_google_cloud_life_sciences=False,
         gcp_region=DEFAULT_REGION,
         gcp_zones=None,
         max_concurrent_tasks=CromwellBackendBase.DEFAULT_CONCURRENT_JOB_LIMIT,
         call_caching_dup_strat=DEFAULT_CALL_CACHING_DUP_STRAT,
+        parallel_composite_upload_threshold=DEFAULT_PARALLEL_COMPOSITE_UPLOAD_THRESHOLD,
     ):
         """
         Args:
             gcp_service_account_key_json:
                 Use this key JSON file to use service_account scheme
                 instead of application_default.
-            use_google_cloud_life_sciences:
-                Use Google Cloud Life Sciences API (v2beta) instead of
-                deprecated Genomics API (v2alpha1).
             gcp_region:
-                Region for Google Cloud Life Sciences API.
+                Region for GCP Batch API.
             gcp_zones:
-                List of zones for Genomics API.
-                Ignored if use_google_cloud_life_sciences.
+                List of zones for GCP Batch API.
+            parallel_composite_upload_threshold:
+                Threshold for parallel composite uploads.
         """
         if call_caching_dup_strat not in (
             CALL_CACHING_DUP_STRAT_REFERENCE,
@@ -360,11 +348,18 @@ class CromwellBackendGcp(CromwellBackendBase):
         self.merge_backend(CromwellBackendGcp.TEMPLATE_BACKEND)
 
         config = self.backend_config
-        genomics = config['genomics']
         filesystems = config['filesystems']
 
+        # Set up batch block for GCP Batch API
+        batch = {}
+        batch['location'] = gcp_region
+        if parallel_composite_upload_threshold:
+            batch['parallel-composite-upload-threshold'] = (
+                parallel_composite_upload_threshold
+            )
+
         if gcp_service_account_key_json:
-            genomics['auth'] = 'service-account'
+            batch['auth'] = 'service-account'
             filesystems[FILESYSTEM_GCS]['auth'] = 'service-account'
             self['google']['auths'] = [
                 {
@@ -376,10 +371,10 @@ class CromwellBackendGcp(CromwellBackendBase):
             # parse service account key JSON to get client_email.
             with open(gcp_service_account_key_json) as fp:
                 key_json = json.loads(fp.read())
-            genomics['compute-service-account'] = key_json['client_email']
+            batch['compute-service-account'] = key_json['client_email']
             self['engine']['filesystems'][FILESYSTEM_GCS]['auth'] = 'service-account'
         else:
-            genomics['auth'] = 'application-default'
+            batch['auth'] = 'application-default'
             filesystems[FILESYSTEM_GCS]['auth'] = 'application-default'
             self['google']['auths'] = [
                 {'name': 'application-default', 'scheme': 'application_default'}
@@ -388,15 +383,11 @@ class CromwellBackendGcp(CromwellBackendBase):
                 'auth'
             ] = 'application-default'
 
-        if use_google_cloud_life_sciences:
-            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_V2BETA
-            genomics['endpoint-url'] = CromwellBackendGcp.GENOMICS_ENDPOINT_V2BETA
-            genomics['location'] = gcp_region
-        else:
-            self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_V2ALPHA
-            genomics['endpoint-url'] = CromwellBackendGcp.GENOMICS_ENDPOINT_V2ALPHA
-            if gcp_zones:
-                self.default_runtime_attributes['zones'] = ' '.join(gcp_zones)
+        config['batch'] = batch
+        self.backend['actor-factory'] = CromwellBackendGcp.ACTOR_FACTORY_BATCH
+
+        if gcp_zones:
+            self.default_runtime_attributes['zones'] = gcp_zones
 
         config['project'] = gcp_prj
         self['engine']['filesystems'][FILESYSTEM_GCS]['project'] = gcp_prj

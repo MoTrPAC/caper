@@ -130,9 +130,7 @@ def test_run_gcp_with_life_sciences_api(
     cmd += ['-m', str(metadata)]
     if gcp_service_account_key_json:
         cmd += ['--gcp-service-account-key-json', gcp_service_account_key_json]
-    cmd += ['--use-google-cloud-life-sciences']
     cmd += ['--gcp-region', 'us-central1']
-    # --gcp-zones should be ignored
     cmd += ['--gcp-zones', 'us-west1-a,us-west1-b']
     cmd += ['--gcp-prj', gcp_prj]
     cmd += ['--memory-retry-error-keys', 'Killed']
