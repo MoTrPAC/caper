@@ -9,7 +9,7 @@ from caper.dict_tool import (
 )
 
 
-def test_merge_dict():
+def test_merge_dict() -> None:
     d1 = {
         'flagstat_qc': {'rep1': {'read1': 100}, 'rep2': {'read2': 400}},
         'etc': {'samstat_qc': {'rep1': {'unmapped': 500, 'mapped': 600}}},
@@ -35,7 +35,7 @@ def test_merge_dict():
     }
 
 
-def test_flatten_dict():
+def test_flatten_dict() -> None:
     d = {
         'flagstat_qc': {
             'rep1': {'read1': 100, 'read2': 200},
@@ -52,7 +52,7 @@ def test_flatten_dict():
     }
 
 
-def test_unflatten_dict():
+def test_unflatten_dict() -> None:
     d_f = {
         ('flagstat_qc', 'rep1', 'read1'): 100,
         ('flagstat_qc', 'rep1', 'read2'): 200,
@@ -69,7 +69,7 @@ def test_unflatten_dict():
     }
 
 
-def test_split_dict():
+def test_split_dict() -> None:
     d = {
         'flagstat_qc': {
             'rep1': {'read1': 100, 'read2': 200},
@@ -100,7 +100,7 @@ def test_split_dict():
     assert splits == splits_ref
 
 
-def test_dict_to_dot_str():
+def test_dict_to_dot_str() -> None:
     d = {
         'rankDir': 'TD',
         'start': '[shape=Mdiamond]',

@@ -1,6 +1,11 @@
-import logging
+"""WDL parser with Caper-specific functionality."""
 
-from .wdl_parser import WDLParser
+from __future__ import annotations
+
+import logging
+import re
+
+from caper.wdl_parser import WDLParser
 
 logger = logging.getLogger(__name__)
 
@@ -8,8 +13,8 @@ logger = logging.getLogger(__name__)
 class CaperWDLParser(WDLParser):
     """WDL parser for Caper."""
 
-    RE_WDL_COMMENT_DOCKER = r'^\s*\#\s*CAPER\s+docker\s(.+)'
-    RE_WDL_COMMENT_SINGULARITY = r'^\s*\#\s*CAPER\s+singularity\s(.+)'
+    RE_WDL_COMMENT_DOCKER = re.compile(r'^\s*#\s*CAPER\s+docker\s(.+)')
+    RE_WDL_COMMENT_SINGULARITY = re.compile(r'^\s*#\s*CAPER\s+singularity\s(.+)')
     WDL_WORKFLOW_META_DOCKER_KEYS = ('default_docker', 'caper_docker')
     WDL_WORKFLOW_META_SINGULARITY_KEYS = ('default_singularity', 'caper_singularity')
     WDL_WORKFLOW_META_CONDA_KEYS = (
@@ -19,17 +24,13 @@ class CaperWDLParser(WDLParser):
         'caper_conda_env',
     )
 
-    def __init__(self, wdl):
+    def __init__(self, wdl: str) -> None:  # noqa: D107
         super().__init__(wdl)
 
     @property
-    def caper_docker(self):
-        """Backward compatibility for property name. See property default_docker."""
-        return self.default_docker
-
-    @property
-    def default_docker(self):
-        """Find a default Docker image in WDL for Caper.
+    def default_docker(self) -> str | None:
+        """
+        Find a default Docker image in WDL for Caper.
 
         Backward compatibililty:
             Keep using old regex method
@@ -40,18 +41,15 @@ class CaperWDLParser(WDLParser):
                 if docker_key in self.workflow_meta:
                     return self.workflow_meta[docker_key]
 
-        ret = self._find_val_of_matched_lines(CaperWDLParser.RE_WDL_COMMENT_DOCKER)
+        ret = self._find_val_of_matched_lines(self.RE_WDL_COMMENT_DOCKER)
         if ret:
             return ret[0].strip('"\'')
+        return None
 
     @property
-    def caper_singularity(self):
-        """Backward compatibility for property name. See property default_singularity."""
-        return self.default_singularity
-
-    @property
-    def default_singularity(self):
-        """Find a default Singularity image in WDL for Caper.
+    def default_singularity(self) -> str | None:
+        """
+        Find a default Singularity image in WDL for Caper.
 
         Backward compatibililty:
             Keep using old regex method
@@ -62,14 +60,16 @@ class CaperWDLParser(WDLParser):
                 if singularity_key in self.workflow_meta:
                     return self.workflow_meta[singularity_key]
 
-        ret = self._find_val_of_matched_lines(CaperWDLParser.RE_WDL_COMMENT_SINGULARITY)
+        ret = self._find_val_of_matched_lines(self.RE_WDL_COMMENT_SINGULARITY)
         if ret:
             return ret[0].strip('"\'')
+        return None
 
     @property
-    def default_conda(self):
+    def default_conda(self) -> None:
         """Find a default Conda environment name in WDL for Caper."""
         if self.workflow_meta:
             for conda_key in CaperWDLParser.WDL_WORKFLOW_META_CONDA_KEYS:
                 if conda_key in self.workflow_meta:
                     return self.workflow_meta[conda_key]
+        return None

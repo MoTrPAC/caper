@@ -1,6 +1,8 @@
+from typing import Any
+import pytest
 import os
 import sys
-
+from pathlib import Path
 from autouri import AutoURI
 
 from caper.cromwell import Cromwell
@@ -9,7 +11,8 @@ from caper.cromwell_metadata import CromwellMetadata
 from .example_wdl import make_directory_with_failing_wdls, make_directory_with_wdls
 
 
-def test_on_successful_workflow(tmp_path, cromwell, womtool):
+@pytest.mark.slow
+def test_on_successful_workflow(tmp_path: Path, cromwell: str, womtool: str) -> None:
     fileobj_stdout = sys.stdout
 
     make_directory_with_wdls(str(tmp_path / 'successful'))
@@ -22,6 +25,7 @@ def test_on_successful_workflow(tmp_path, cromwell, womtool):
         fileobj_stdout=fileobj_stdout,
         cwd=str(tmp_path / 'successful'),
     )
+    assert th is not None
     th.join()
     metadata = th.returnvalue
     assert metadata
@@ -41,7 +45,7 @@ def test_on_successful_workflow(tmp_path, cromwell, womtool):
     )
 
     # test recurse_calls(): test with a simple function
-    def fnc(call_name, call, parent_call_names):
+    def fnc(call_name: str, call: dict[str, Any], parent_call_names: tuple[str, ...]) -> None:
         assert call_name in ('main.t1', 'sub.t2', 'sub_sub.t3')
         assert call['executionStatus'] == 'Done'
         if call_name == 'main.t1':
@@ -51,7 +55,8 @@ def test_on_successful_workflow(tmp_path, cromwell, womtool):
         elif call_name == 'sub_sub.t3':
             assert parent_call_names == ('main.sub', 'sub.sub_sub')
         else:
-            raise ValueError('Wrong call_name: {name}'.format(name=call_name))
+            msg = f'Wrong call_name: {call_name}'
+            raise ValueError(msg)
 
     list(cm.recurse_calls(fnc))
 
@@ -66,7 +71,8 @@ def test_on_successful_workflow(tmp_path, cromwell, womtool):
     assert CromwellMetadata(m_file_on_root).metadata == cm.metadata
 
 
-def test_on_failed_workflow(tmp_path, cromwell, womtool):
+@pytest.mark.slow
+def test_on_failed_workflow(tmp_path: Path, cromwell: str, womtool: str) -> None:
     fileobj_stdout = sys.stdout
 
     make_directory_with_failing_wdls(str(tmp_path / 'failed'))
@@ -80,6 +86,7 @@ def test_on_failed_workflow(tmp_path, cromwell, womtool):
         fileobj_stdout=fileobj_stdout,
         cwd=str(tmp_path / 'failed'),
     )
+    assert th is not None
     th.join()
 
     # check failed

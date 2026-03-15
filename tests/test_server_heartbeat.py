@@ -6,12 +6,12 @@ import pytest
 from caper.server_heartbeat import ServerHeartbeat, ServerHeartbeatTimeoutError
 
 
-def test_server_heartbeat(tmp_path):
+def test_server_heartbeat(tmp_path) -> None:
     """All methods will be tested here.
     This willl test 3 things:
         - can read from file
         - can get hostname of this machine
-        - can ignore old file (> heartbeat_timeout of 5 sec)
+        - can ignore old file (> heartbeat_timeout of 5 sec).
     """
     hb_file = tmp_path / 'hb_file'
 

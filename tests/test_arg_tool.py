@@ -79,7 +79,7 @@ def parser_with_subparsers():
     return parser, [p_sub_a, p_sub_b]
 
 
-def test_read_from_conf(tmp_path):
+def test_read_from_conf(tmp_path) -> None:
     c = tmp_path / 'c1.conf'
     c.write_text(CONF_CONTENTS)
 
@@ -102,8 +102,8 @@ def test_read_from_conf(tmp_path):
     d2 = read_from_conf(c, no_strip_quote=True)
     assert d2['param_wo_default'] == '"please_remove_double_quote"'
     assert d2['param_w_type_wo_default2'] == '"5.0"'
-    assert d2['flag_w_default2'] == '\'False\''
-    assert d2['flag_wo_default'] == '\'FALSE\''
+    assert d2['flag_w_default2'] == "'False'"
+    assert d2['flag_wo_default'] == "'FALSE'"
     assert d2['flag_wo_default2'] == '"True"'
 
     c2 = tmp_path / 'c2.conf'
@@ -113,10 +113,8 @@ def test_read_from_conf(tmp_path):
         d2 = read_from_conf(c2)
 
 
-def test_update_parsers_defaults_with_conf(tmp_path, parser_wo_subparsers):
-    """Check if this function correctly updates argparse parser's
-    default values.
-    """
+def test_update_parsers_defaults_with_conf(tmp_path, parser_wo_subparsers) -> None:
+    """Check if this function correctly updates argparse parser's default values."""
     val_type = {'param_w_type_wo_default2': float}
     val_default = {'param_w_type_wo_default3': 'hello', 'param_w_int_default3': 50}
 
@@ -156,10 +154,8 @@ def test_update_parsers_defaults_with_conf(tmp_path, parser_wo_subparsers):
 
 def test_update_parsers_defaults_with_conf_with_subparsers(
     tmp_path, parser_with_subparsers
-):
-    """Check if this function correctly updates argparse parser's
-    default values.
-    """
+) -> None:
+    """Check if this function correctly updates argparse parser's default values."""
     p, subparsers = parser_with_subparsers
     c1 = tmp_path / 'c1.conf'
 

@@ -1,0 +1,63 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  # Unit tests - runs on every push to master/PR
+  # Excludes Google Cloud tests
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.12"
+          - "3.13"
+          - "3.14"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            tzdata default-jre
+
+      - name: Install Singularity 4
+        env:
+          SINGULARITY_VERSION: 4.3.7
+        run: |
+          UBUNTU_CODENAME=$(lsb_release -cs)
+          wget -q "https://github.com/sylabs/singularity/releases/download/v${SINGULARITY_VERSION}/singularity-ce_${SINGULARITY_VERSION}-${UBUNTU_CODENAME}_amd64.deb"
+          sudo apt-get install -y "./singularity-ce_${SINGULARITY_VERSION}-${UBUNTU_CODENAME}_amd64.deb"
+          singularity --version
+
+      - name: Install dependencies
+        run: uv sync --all-groups --all-extras
+
+      - name: Run unit tests (excluding Google Cloud tests)
+        run: uv run pytest -m "not google_cloud and not slow" -vv -s --junit-xml=report.xml
+
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: success() || failure()
+        with:
+          name: Unit Test Results
+          path: report.xml
+          reporter: java-junit

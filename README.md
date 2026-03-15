@@ -1,9 +1,11 @@
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) [![CircleCI](https://circleci.com/gh/ENCODE-DCC/caper.svg?style=svg)](https://circleci.com/gh/ENCODE-DCC/caper)
+[![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FMoTrPAC%2Fcaper%2Fmain%2Fpyproject.toml)](./pyproject.toml)
 
 
 ## Introduction
 
-Caper (Cromwell Assisted Pipeline ExecutoR) is a wrapper Python package for [Cromwell](https://github.com/broadinstitute/cromwell/). Caper wraps Cromwell to run pipelines on multiple platforms like GCP (Google Cloud Platform), AWS (Amazon Web Service) and HPCs like SLURM, SGE, PBS/Torque and LSF. It provides easier way of running Cromwell server/run modes by automatically composing necessary input files for Cromwell. Caper can run each task on a specified environment (Docker, Singularity or Conda). Also, Caper automatically localizes all files (keeping their directory structure) defined in your input JSON and command line according to the specified backend. For example, if your chosen backend is GCP and files in your input JSON are on S3 buckets (or even URLs) then Caper automatically transfers `s3://` and `http(s)://` files to a specified `gs://` bucket directory. Supported URIs are `s3://`, `gs://`, `http(s)://` and local absolute paths. You can use such URIs either in CLI and input JSON. Private URIs are also accessible if you authenticate using cloud platform CLIs like `gcloud auth`, `aws configure` and using `~/.netrc` for URLs.
+Caper (Cromwell Assisted Pipeline ExecutoR) is a wrapper Python package for [Cromwell](https://github.com/broadinstitute/cromwell/). This project is maintained by [MoTrPAC](https://motrpac.org/), forked from the original [ENCODE-DCC caper](https://github.com/ENCODE-DCC/caper) to add support for [Google Cloud Batch API](https://cloud.google.com/batch) and remove deprecated Google Cloud Life Sciences and Google Cloud Genomics APIs.
+
+Caper wraps Cromwell to run pipelines on multiple platforms like GCP (Google Cloud Platform), AWS (Amazon Web Service) and HPCs like SLURM, SGE, PBS/Torque and LSF. It provides an easier way of running Cromwell server/run modes by automatically composing necessary input files for Cromwell. Caper can run each task on a specified environment (Docker, Singularity or Conda). Also, Caper automatically localizes all files (keeping their directory structure) defined in your input JSON and command line according to the specified backend. For example, if your chosen backend is GCP and files in your input JSON are on S3 buckets (or even URLs) then Caper automatically transfers `s3://` and `http(s)://` files to a specified `gs://` bucket directory. Supported URIs are `s3://`, `gs://`, `http(s)://` and local absolute paths. You can use such URIs either in CLI and input JSON. Private URIs are also accessible if you authenticate using cloud platform CLIs like `gcloud auth`, `aws configure` and using `~/.netrc` for URLs.
 
 
 ## Installation for Google Cloud Platform and AWS
@@ -18,19 +20,22 @@ See [this](scripts/aws_caper_server/README.md) for details.
 
 ## Installation for local computers and HPCs
 
-1) Make sure that you have Java (>= 11) and Python>=3.6 installed on your system and `pip` to install Caper.
+1) Make sure that you have Java (>= 17) and Python >= 3.12 installed on your system.
+
+2) Install Caper from the [MoTrPAC GitHub repository](https://github.com/MoTrPAC/caper) using [uv](https://docs.astral.sh/uv/) (recommended) or pip:
 
 	```bash
-	$ pip install caper
+	# Using uvx (recommended) - runs caper without permanent installation
+	$ uvx --from git+https://github.com/MoTrPAC/caper caper
+
+	# Or install with uv
+	$ uv pip install git+https://github.com/MoTrPAC/caper
+
+	# Or install with pip
+	$ pip install git+https://github.com/MoTrPAC/caper
 	```
 
-2) If you see an error message like `caper: command not found` after installing then add the following line to the bottom of `~/.bashrc` and re-login.
-
-	```bash
-	export PATH=$PATH:~/.local/bin
-	```
-
-3) Choose a backend from the following table and initialize Caper. This will create a default Caper configuration file `~/.caper/default.conf`, which have only required parameters for each backend. `caper init` will also install Cromwell/Womtool JARs on `~/.caper/`. Downloading those files can take up to 10 minutes. Once they are installed, Caper can completely work offline with local data files.
+3) Choose a backend from the following table and initialize Caper. This will create a default Caper configuration file `~/.caper/default.conf`, which has only required parameters for each backend. `caper init` will also install Cromwell/Womtool JARs in `~/.caper/`. Downloading those files can take up to 10 minutes. Once they are installed, Caper can work completely offline with local data files.
 
 	**Backend**|**Description**
 	:--------|:-----
@@ -51,7 +56,7 @@ See [this](scripts/aws_caper_server/README.md) for details.
 
 ## Docker, Singularity and Conda
 
-For local backends (`local`, `slurm`, `sge`, `pbs` and `lsf`), you can use `--docker`, `--singularity` or `--conda` to run WDL tasks in a pipeline within one of these environment. For example, `caper run ... --singularity docker://ubuntu:latest` will run each task within a Singularity image built from a docker image `ubuntu:latest`. These parameters can also be used as flags. If used as a flag, Caper will try to find a default docker/singularity/conda in WDL. e.g. All ENCODE pipelines have default docker/singularity images defined within WDL's meta section (under key `caper_docker` or `default_docker`).
+For local backends (`local`, `slurm`, `sge`, `pbs` and `lsf`), you can use `--docker`, `--singularity` or `--conda` to run WDL tasks in a pipeline within one of these environments. For example, `caper run ... --singularity docker://ubuntu:latest` will run each task within a Singularity image built from a docker image `ubuntu:latest`. These parameters can also be used as flags. If used as a flag, Caper will try to find a default docker/singularity/conda in WDL. Pipelines can define default docker/singularity images within WDL's meta section (under key `caper_docker` or `default_docker`).
 
 > **IMPORTANT**: Docker/singularity/conda defined in Caper's configuration file or in CLI (`--docker`, `--singularity` and `--conda`) will be overriden by those defined in WDL task's `runtime`. We provide these parameters to define default/base environment for a pipeline, not to override on WDL task's `runtime`.
 

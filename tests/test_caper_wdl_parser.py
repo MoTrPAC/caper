@@ -27,10 +27,10 @@ OLD_WDL_CONTENTS = dedent(
 )
 
 
-def test_properties(tmp_path):
+def test_properties(tmp_path) -> None:
     """Test the following properties.
-    - caper_docker
-    - caper_singularity
+    - default_docker
+    - default_singularity.
     """
     main_wdl = tmp_path / 'main.wdl'
     main_wdl.write_text(WDL_CONTENTS)
@@ -40,10 +40,10 @@ def test_properties(tmp_path):
 
     # test reading from workflow.meta
     main = CaperWDLParser(str(main_wdl))
-    assert main.caper_docker == 'ubuntu:latest'
-    assert main.caper_singularity == 'docker://ubuntu:latest'
+    assert main.default_docker == 'ubuntu:latest'
+    assert main.default_singularity == 'docker://ubuntu:latest'
 
     # test reading from comments (old-style)
     old = CaperWDLParser(str(old_wdl))
-    assert old.caper_docker == 'ubuntu:latest'
-    assert old.caper_singularity == 'docker://ubuntu:latest'
+    assert old.default_docker == 'ubuntu:latest'
+    assert old.default_singularity == 'docker://ubuntu:latest'

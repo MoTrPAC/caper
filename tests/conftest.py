@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""
-"""
+"""Defines shared fixtures and custom CLI options for Caper's tests."""
+
+import os
+
 import pytest
 
 from caper.cromwell import Cromwell
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        '--ci-prefix', default='default_ci_prefix', help='Prefix for CI test.'
-    )
+def pytest_addoption(parser) -> None:
+    parser.addoption('--ci-prefix', default='default_ci_prefix', help='Prefix for CI test.')
     parser.addoption(
         '--gcs-root',
-        default='gs://encode-test-caper',
-        help='GCS root path for CI test. '
-        'This GCS bucket must be publicly accessible '
-        '(read access for everyone is enough for testing).',
+        default='gs://motrpac-test-caper',
+        help='GCS root path for CI test. ',
     )
     parser.addoption(
         '--cromwell',
@@ -27,11 +25,13 @@ def pytest_addoption(parser):
         default=Cromwell.DEFAULT_WOMTOOL,
         help='URI for Womtool JAR. Local path is recommended.',
     )
+    parser.addoption('--gcp-prj', help='Project on Google Cloud Platform.')
     parser.addoption(
-        '--gcp-prj', default='encode-dcc-1016', help='Project on Google Cloud Platform.'
-    )
+          '--gcp-service-account-key-json', help='JSON key file for GCP service account.'
+      )
     parser.addoption(
-        '--gcp-service-account-key-json', help='JSON key file for GCP service account.'
+        '--gcp-compute-service-account',
+        help='Service account email to use for Google Compute Engine batch jobs.',
     )
     parser.addoption(
         '--debug-caper', action='store_true', help='Debug-level logging for CLI tests.'
@@ -46,7 +46,11 @@ def ci_prefix(request):
 @pytest.fixture(scope='session')
 def gcs_root(request):
     """GCS root to generate test GCS URIs on."""
-    return request.config.getoption('--gcs-root').rstrip('/')
+    root = request.config.getoption('--gcs-root')
+    if not root.startswith('gs://'):
+        msg = f'GCS root must start with "gs://" but got {root}'
+        raise ValueError(msg)
+    return root.rstrip('/')
 
 
 @pytest.fixture(scope='session')
@@ -61,7 +65,11 @@ def womtool(request):
 
 @pytest.fixture(scope='session')
 def gcp_prj(request):
-    return request.config.getoption('--gcp-prj')
+    project = request.config.getoption('--gcp-prj') or os.getenv('GOOGLE_CLOUD_PROJECT')
+    if project is None:
+        msg = 'Must supply --gcp-prj arg or set GOOGLE_CLOUD_PROJECT env variable'
+        raise ValueError(msg)
+    return project
 
 
 @pytest.fixture(scope='session')
@@ -70,10 +78,15 @@ def gcp_service_account_key_json(request):
 
 
 @pytest.fixture(scope='session')
+def gcp_compute_service_account(request):
+    return request.config.getoption('--gcp-compute-service-account')
+
+
+@pytest.fixture(scope='session')
 def debug_caper(request):
     return request.config.getoption('--debug-caper')
 
 
 @pytest.fixture(scope='session')
-def gcp_res_analysis_metadata():
-    return 'gs://caper-data/gcp_resource_analysis/out/atac/e5eab444-cb6c-414a-a090-2c12417be542/metadata.json'
+def gcp_res_analysis_metadata(gcs_root) -> str:
+    return f'{gcs_root}/resource_analysis/metadata.json'

@@ -12,7 +12,7 @@ from .example_wdl import make_directory_with_wdls
 
 
 @pytest.mark.parametrize(
-    'test_input,expected',
+    ('test_input', 'expected'),
     [
         ('asldkhjlkasdf289jisdl;sladkjasdflksd', False),
         ('cromwell-f9c26f2e-f550-4748-a650-5d0d4cab9f3a', False),
@@ -21,16 +21,16 @@ from .example_wdl import make_directory_with_wdls
         ('F9C26f2e-F550-4748-A650-5D0D4cab9f3a', False),
         ('f9c26f2e', False),
         ([], False),
-        (tuple(), False),
+        ((), False),
         (None, False),
     ],
 )
-def test_is_valid_uuid(test_input, expected):
+def test_is_valid_uuid(test_input, expected) -> None:
     assert is_valid_uuid(test_input) == expected
 
 
 @pytest.mark.parametrize(
-    'test_input,expected',
+    ('test_input', 'expected'),
     [
         ('?????', True),
         (('lskadfj', 'sdkfjaslf'), False),
@@ -40,15 +40,16 @@ def test_is_valid_uuid(test_input, expected):
         (('*', '?'), True),
         (('_', '-', 'asdfjkljklasdfjklasdf'), False),
         ([], False),
-        (tuple(), False),
+        ((), False),
         (None, False),
     ],
 )
-def test_has_wildcard(test_input, expected):
+def test_has_wildcard(test_input, expected) -> None:
     assert has_wildcard(test_input) == expected
 
 
-def test_all(tmp_path, cromwell, womtool):
+@pytest.mark.slow
+def test_all(tmp_path, cromwell, womtool) -> None:
     """Test Cromwell.server() method, which returns a Thread object."""
     server_port = 8010
     fileobj_stdout = sys.stdout
@@ -59,27 +60,24 @@ def test_all(tmp_path, cromwell, womtool):
     o_dir = tmp_path / 'output'
     o_dir.mkdir()
 
-    labels_file = CaperLabels().create_file(
-        directory=str(tmp_path), str_label=test_label
-    )
+    labels_file = CaperLabels().create_file(directory=str(tmp_path), str_label=test_label)
 
     is_server_started = False
 
-    def on_server_start():
+    def on_server_start() -> None:
         nonlocal is_server_started
         is_server_started = True
 
     workflow_id = None
     is_workflow_done = False
 
-    def on_status_change(metadata):
+    def on_status_change(metadata) -> None:
         nonlocal workflow_id
         nonlocal is_workflow_done
 
-        if metadata:
-            if metadata['id'] == workflow_id:
-                if metadata['status'] in ('Succeeded', 'Failed'):
-                    is_workflow_done = True
+        if metadata and metadata['id'] == workflow_id:
+            if metadata['status'] in ('Succeeded', 'Failed'):
+                is_workflow_done = True
 
     # also tests two callback functions
     try:
@@ -98,7 +96,8 @@ def test_all(tmp_path, cromwell, womtool):
         while not is_server_started:
             time.sleep(1)
             if time.time() - t_start > 60:
-                raise TimeoutError('Timed out waiting for Cromwell server spin-up.')
+                msg = 'Timed out waiting for Cromwell server spin-up.'
+                raise TimeoutError(msg)
 
         # another way of checking server is started
         assert th.status
@@ -129,9 +128,7 @@ def test_all(tmp_path, cromwell, womtool):
         # find by label
         workflow_by_label = cra.find(labels=[('caper-str-label', test_label)])[0]
         # find by workflow ID with wildcard *
-        workflow_by_id_with_wildcard = cra.find(workflow_ids=[workflow_id[:-10] + '*'])[
-            0
-        ]
+        workflow_by_id_with_wildcard = cra.find(workflow_ids=[workflow_id[:-10] + '*'])[0]
         # find by label with wildcard ?
         workflow_by_label_with_wildcard = cra.find(
             labels=[('caper-str-label', test_label[:-1] + '?')]
@@ -169,9 +166,9 @@ def test_all(tmp_path, cromwell, womtool):
         t_start = time.time()
         while not is_workflow_done:
             time.sleep(1)
-            print('polling: ', workflow_id, is_workflow_done)
             if time.time() - t_start > 120:
-                raise TimeoutError('Timed out waiting for workflow being done.')
+                msg = 'Timed out waiting for workflow being done.'
+                raise TimeoutError(msg)
 
         metadata = cra.get_metadata([workflow_id], embed_subworkflow=True)[0]
         metadata_wo_sub = cra.get_metadata([workflow_id], embed_subworkflow=False)[0]

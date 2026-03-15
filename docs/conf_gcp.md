@@ -1,65 +1,78 @@
-Deprecated. Please see [this](../scripts/gcp_caper_server/README.md) instead.
-
-# DEPRECATED
-
 # Configuration for Google Cloud Platform backend (`gcp`)
 
-1. Sign up for a Google account.
-2. Go to [Google Project](https://console.developers.google.com/project) page and click "SIGN UP FOR FREE TRIAL" on the top left and agree to terms.
-3. Set up a payment method and click "START MY FREE TRIAL".
-4. Create a [Google Project](https://console.developers.google.com/project) `[YOUR_PROJECT_NAME]` and choose it on the top of the page.
-5. Create a [Google Cloud Storage bucket](https://console.cloud.google.com/storage/browser) `gs://[YOUR_BUCKET_NAME]` by clicking on a button "CREATE BUCKET" and create it to store pipeline outputs.
-6. Find and enable following APIs in your [API Manager](https://console.developers.google.com/apis/library). Click a back button on your web brower after enabling each.
+> **NOTE**: For complete GCP server setup instructions, see [scripts/gcp_caper_server/README.md](../scripts/gcp_caper_server/README.md).
+
+> **IMPORTANT**: Google Cloud Genomics API and Cloud Life Sciences API have been deprecated and removed. Caper now uses [Google Cloud Batch API](https://cloud.google.com/batch) exclusively.
+
+## Prerequisites
+
+1. Sign up for a Google account and set up billing in the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a [Google Project](https://console.developers.google.com/project).
+3. Create a [Google Cloud Storage bucket](https://console.cloud.google.com/storage/browser) to store pipeline outputs.
+4. Enable the following APIs in your [API Manager](https://console.developers.google.com/apis/library):
     * Compute Engine API
-    * Google Cloud Storage (DO NOT click on "Create credentials")
+    * Google Cloud Storage
     * Google Cloud Storage JSON API
-    * Genomics API
-    * **Google Cloud Life Sciences API** (for Cromwell's new API, i.e. `--use-google-cloud-life-sciences`)
+    * Cloud Batch API
 
-7. Install [Google Cloud Platform SDK](https://cloud.google.com/sdk/downloads) and authenticate through it. You will be asked to enter verification keys. Get keys from the URLs they provide.
-    ```bash
-    $ gcloud auth login --no-launch-browser
-    $ gcloud auth application-default login --no-launch-browser
-    ```
-
-8. If you see permission errors at runtime, then unset environment variable `GOOGLE_APPLICATION_CREDENTIALS` or add it to your BASH startup scripts (`$HOME/.bashrc` or `$HOME/.bash_profile`).
-    ```bash
-      unset GOOGLE_APPLICATION_CREDENTIALS
-    ```
-
-7. Set your default Google Cloud Project. Pipeline will provision instances on this project.
+5. Set your default Google Cloud Project:
     ```bash
     $ gcloud config set project [YOUR_PROJECT_NAME]
     ```
 
-# Setting up a Caper server instance
+## Authentication
 
-You will find [this](./conf_encode_workshop_2019.md) useful to set up your own Caper server on Google Cloud Platform.
+### Recommended: Application Default Credentials (ADC)
 
-# How to run Caper with a service account
+Caper uses [Application Default Credentials](https://cloud.google.com/docs/authentication/application-default-credentials) to authenticate with Google Cloud services. The recommended authentication method depends on your environment:
 
-On your Google Cloud Console, create a service account (`IAM & Admin` -> `Service Accounts`) with the following roles. You can add roles later in `IAM & Admin` -> `IAM`.
-    * Service Account User
-    * Compute Admin
-    * Genomics Admin
-    * **Cloud Life Sciences Admin** (for Cromwell's new API, i.e. `--use-google-cloud-life-sciences`)
-    * Storage Admin (or set it up for an individual bucket)
+**On a Compute Engine VM:**
 
-Create a secret key JSON file for your service account. Make sure that your service account has enough permission for provionsing VM instances and write permission on output/work Google Cloud Storage buckets (`--gcp-out-dir` and `--gcp-work-dir`).
+Attach a service account to the VM instance. Applications automatically use the VM's credentials via the metadata server—no additional configuration needed.
 
-> **IMPORTANT**: Click on the created service account and make sure that `Enable G Suite Domain-wide Delegation` is checked to prevent the following permission error.
-
+```bash
+# When creating the VM
+gcloud compute instances create [INSTANCE_NAME] \
+    --service-account=[SERVICE_ACCOUNT_EMAIL] \
+    --scopes=cloud-platform
 ```
-400 Bad Request
-POST https://lifesciences.googleapis.com/v2beta/projects/99884963860/locations/us-central1/operations/XXXXXXXXXXXXXXXXXXXX:cancel
-{
-  "code" : 400,
-  "errors" : [ {
-    "domain" : "global",
-    "message" : "Precondition check failed.",
-    "reason" : "failedPrecondition"
-  } ],
-  "message" : "Precondition check failed.",
-  "status" : "FAILED_PRECONDITION"
-}
+
+**For local development:**
+
+Use your Google account credentials:
+
+```bash
+$ gcloud auth login --no-launch-browser
+$ gcloud auth application-default login --no-launch-browser
 ```
+
+### Legacy: Service Account JSON Keys (Not Recommended)
+
+> **WARNING**: JSON key files pose security risks—they can be leaked, are difficult to rotate, and provide long-lived credentials. Prefer VM-attached service accounts or user credentials instead.
+
+If you must use JSON keys:
+- Store securely with restricted permissions (`chmod 600`)
+- Never commit to version control
+- Rotate regularly
+- Set `GOOGLE_APPLICATION_CREDENTIALS` environment variable
+
+Consider [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) as a more secure alternative to JSON keys.
+
+## Service Account Permissions
+
+Create a service account with the following roles:
+* Service Account User
+* Compute Admin
+* Batch Admin
+* Storage Admin (or configure per-bucket permissions)
+
+> **NOTE**: The service account used to launch Batch jobs is different from the Compute Service Account used by Batch VMs to run tasks. You can specify a different Compute Service Account using `--gcp-compute-service-account`. The Compute Service Account needs `roles/batch.agentReporter` to report status back to Batch.
+
+## Troubleshooting
+
+If you see permission errors at runtime:
+
+1. Verify your VM has an attached service account with the correct roles
+2. Ensure `GOOGLE_APPLICATION_CREDENTIALS` is unset if using default credentials
+3. Check that the service account has access to required GCS buckets
+4. Run `gcloud auth application-default print-access-token` to verify credentials are working

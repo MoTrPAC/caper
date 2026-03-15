@@ -11,7 +11,7 @@ UBUNTU_18_04_3_LAST_HASH_TAR_GZ = (
 )
 
 
-def test_find_bindpath(tmp_path):
+def test_find_bindpath(tmp_path) -> None:
     """Parse input JSON file to recursively get all the files defined in it.
     For found local abspaths, find common root directories for those.
 

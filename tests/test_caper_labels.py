@@ -4,7 +4,7 @@ import os
 from caper.caper_labels import CaperLabels
 
 
-def test_create_file(tmp_path):
+def test_create_file(tmp_path) -> None:
     cl = CaperLabels()
 
     backend = 'my_backend'

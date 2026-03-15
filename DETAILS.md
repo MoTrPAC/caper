@@ -99,7 +99,7 @@ hpc abort | JOB_ID | Abort a Caper leader job. This will cascade kill all child 
 
 > **IMPORTANT**: `--deepcopy` has been deprecated and it's activated by default. You can disable it with `--no-deepcopy`.
 
-Deepcopy allows Caper to **RECURSIVELY** copy files defined in your input JSON into your target backend's temporary storage. For example, Cromwell cannot read directly from URLs in an [input JSON file](https://github.com/ENCODE-DCC/atac-seq-pipeline/blob/master/examples/caper/ENCSR356KRQ_subsampled.json), but Caper makes copies of these URLs on your backend's temporary directory (e.g. `--local-loc-dir` for `local`, `--gcp-loc-dir` for `gcp`) and pass them to Cromwell.
+Deepcopy allows Caper to **RECURSIVELY** copy files defined in your input JSON into your target backend's temporary storage. For example, Cromwell cannot read directly from URLs in an input JSON file, but Caper makes copies of these URLs on your backend's temporary directory (e.g. `--local-loc-dir` for `local`, `--gcp-loc-dir` for `gcp`) and pass them to Cromwell.
 
 ## How to manage configuration file per project
 
@@ -187,8 +187,6 @@ We highly recommend to use a default configuration file described in the section
 	**Conf. file**|**Cmd. line**|**Description**
 	:-----|:-----|:-----
 	gcp-prj|--gcp-prj|Google Cloud project
-	use-google-cloud-life-sciences|--use-google-cloud-life-sciences|Use Google Cloud Life Sciences API instead of (deprecated) Genomics API
-	gcp-zones|--gcp-zones|Comma-delimited Google Cloud Platform zones to provision worker instances (e.g. us-central1-c,us-west1-b)
 	gcp-out-dir, out-gcs-bucket|--gcp-out-dir, --out-gcs-bucket|Output `gs://` directory for GC backend
 	gcp-loc-dir, tmp-gcs-bucket|--gcp-loc-dir, --tmp-gcs-bucket|Tmp. directory for localization on GC backend
 	gcp-call-caching-dup-strat|--gcp-call-caching-dup-strat|Call-caching duplication strategy. Choose between `copy` and `reference`. `copy` will make a copy for a new workflow, `reference` will make refer to the call-cached output of a previous workflow in `metadata.json`. Defaults to `reference`
@@ -466,12 +464,12 @@ If Caper's built-in backends don't work as expected on your clusters (e.g. due t
 Find this `backend.conf` first by dry-running `caper run [WDL] --dry-run ...`. For example of a `slurm` backend:
 ```
 $ caper run main.wdl --dry-run
-2020-07-07 11:18:13,196|caper.caper_runner|INFO| Adding encode-dcc-1016 to env var GOOGLE_CLOUD_PROJECT
-2020-07-07 11:18:13,197|caper.caper_base|INFO| Creating a timestamped temporary directory. /mnt/data/scratch/leepc12/test_caper_tmp/main/20200707_111813_197082
-2020-07-07 11:18:13,197|caper.caper_runner|INFO| Localizing files on work_dir. /mnt/data/scratch/leepc12/test_caper_tmp/main/20200707_111813_197082
+2020-07-07 11:18:13,196|caper.caper_runner|INFO| Adding my-gcp-project to env var GOOGLE_CLOUD_PROJECT
+2020-07-07 11:18:13,197|caper.caper_base|INFO| Creating a timestamped temporary directory. /scratch/user/caper_tmp/main/20200707_111813_197082
+2020-07-07 11:18:13,197|caper.caper_runner|INFO| Localizing files on work_dir. /scratch/user/caper_tmp/main/20200707_111813_197082
 2020-07-07 11:18:13,829|caper.cromwell|INFO| Validating WDL/inputs/imports with Womtool...
 2020-07-07 11:18:16,034|caper.cromwell|INFO| Womtool validation passed.
-2020-07-07 11:18:16,035|caper.caper_runner|INFO| launching run: wdl=/mnt/data2/scratch/leepc12/test_wdl1_sub/main.wdl, inputs=None, backend_conf=/mnt/data/scratch/leepc12/test_caper_tmp/main/20200707_111813_197082/backend.conf
+2020-07-07 11:18:16,035|caper.caper_runner|INFO| launching run: wdl=/scratch/user/workflows/main.wdl, inputs=None, backend_conf=/scratch/user/caper_tmp/main/20200707_111813_197082/backend.conf
 ```
 
 Find `backend_conf`, make a copy of it and edit it.
@@ -554,7 +552,7 @@ until [ $ITER -ge 3 ]; do
     sleep 30
 done
 """
-        root = "/mnt/data/scratch/leepc12/caper_out"
+        root = "/scratch/user/caper_out"
         exit-code-timeout-seconds = 360
         check-alive = """for ITER in 1 2 3; do
     CHK_ALIVE=$(squeue --noheader -j ${job_id} --format=%i | grep ${job_id})
