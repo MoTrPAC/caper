@@ -110,6 +110,10 @@ gcp-call-caching-dup-strat=
 # e.g. us-central1
 gcp-region=
 
+# Enable GCP cost estimation (requires Cloud Billing API enabled on your project)
+# See: https://cromwell.readthedocs.io/en/stable/cromwell_features/CostEstimation/
+gcp-cost-estimation=
+
 # Number of retrials. This parameter also applies to non-OOM failures.
 max-retries=1
 """

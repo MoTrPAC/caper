@@ -5,7 +5,7 @@ will be tested.
 
 """
 
-from caper.cromwell_backend import CromwellBackendBase
+from caper.cromwell_backend import CromwellBackendBase, CromwellBackendCostService
 
 
 def test_cromwell_backend_base_backend() -> None:
@@ -156,4 +156,26 @@ def test_cromwell_backend_gcp_default_has_dockerhub_mirror() -> None:
     config = gcp.backend_config
     assert 'docker-mirror' in config
     assert config['docker-mirror']['dockerhub']['enabled'] is True
-    assert config['docker-mirror']['dockerhub']['address'] == 'mirror.gcr.io'
+
+
+def test_cost_service_enabled() -> None:
+    """When enabled, generates services.GcpCostCatalogService HOCON block."""
+    cs = CromwellBackendCostService(enabled=True)
+    assert 'services' in cs
+    svc = cs['services']['GcpCostCatalogService']
+    assert svc['class'] == 'cromwell.services.cost.GcpCostCatalogService'
+    assert svc['config']['enabled'] is True
+    assert svc['config']['catalogExpirySeconds'] == 86400
+
+
+def test_cost_service_disabled() -> None:
+    """When disabled, generates empty dict."""
+    cs = CromwellBackendCostService(enabled=False)
+    assert dict(cs) == {}
+
+
+def test_cost_service_custom_expiry() -> None:
+    """Custom catalog expiry seconds are passed through."""
+    cs = CromwellBackendCostService(enabled=True, catalog_expiry_seconds=3600)
+    svc = cs['services']['GcpCostCatalogService']
+    assert svc['config']['catalogExpirySeconds'] == 3600

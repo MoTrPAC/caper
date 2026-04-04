@@ -17,6 +17,7 @@ from .cromwell_backend import (
     CromwellBackendAws,
     CromwellBackendBase,
     CromwellBackendCommon,
+    CromwellBackendCostService,
     CromwellBackendDatabase,
     CromwellBackendGcp,
     CromwellBackendLocal,
@@ -85,6 +86,8 @@ class CaperRunner(CaperBase):
         gcp_dockerhub_mirror: bool = True,
         gcp_dockerhub_mirror_address: str = 'mirror.gcr.io',
         gcp_region: str = CromwellBackendGcp.DEFAULT_REGION,
+        gcp_cost_estimation: bool = False,
+        gcp_cost_catalog_expiry: int = CromwellBackendCostService.DEFAULT_CATALOG_EXPIRY_SECONDS,
         aws_batch_arn: str | None = None,
         aws_region: str | None = None,
         aws_out_dir: str | None = None,
@@ -186,6 +189,10 @@ class CaperRunner(CaperBase):
                 Address of the Docker Hub mirror (default: mirror.gcr.io).
             gcp_region:
                 Region for Google Cloud Batch API.
+            gcp_cost_estimation:
+                Enable GCP cost estimation service in Cromwell.
+            gcp_cost_catalog_expiry:
+                How long (seconds) Cromwell caches the GCP pricing catalog.
             aws_batch_arn:
                 ARN for AWS Batch.
             aws_region:
@@ -271,6 +278,8 @@ class CaperRunner(CaperBase):
             gcp_dockerhub_mirror=gcp_dockerhub_mirror,
             gcp_dockerhub_mirror_address=gcp_dockerhub_mirror_address,
             gcp_region=gcp_region,
+            gcp_cost_estimation=gcp_cost_estimation,
+            gcp_cost_catalog_expiry=gcp_cost_catalog_expiry,
             aws_batch_arn=aws_batch_arn,
             aws_region=aws_region,
             aws_out_dir=aws_out_dir,

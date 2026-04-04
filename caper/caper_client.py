@@ -153,6 +153,24 @@ class CaperClient(CaperBase):
             workflow_ids, labels, embed_subworkflow=embed_subworkflow
         )
 
+    def cost(
+        self,
+        wf_ids_or_labels: Sequence[str],
+    ) -> list[dict[str, Any]] | None:
+        """Retrieve estimated costs for workflows from a Cromwell server.
+
+        Args:
+            wf_ids_or_labels:
+                List of workflow IDs or string labels (Caper's string label).
+                Wildcards (*, ?) are allowed.
+
+        Returns:
+            List of cost response dicts for matched workflows.
+        """
+        workflow_ids, labels = self._split_workflow_ids_and_labels(wf_ids_or_labels)
+
+        return self._cromwell_rest_api.get_cost(workflow_ids, labels)
+
     def _split_workflow_ids_and_labels(
         self, workflow_ids_or_labels: Sequence[str] | None
     ) -> tuple[Sequence[str], Sequence[tuple[str, str]]]:
