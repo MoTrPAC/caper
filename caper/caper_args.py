@@ -354,6 +354,25 @@ def _add_gcp_runner_args(parser: ArgumentParser) -> None:
         default='mirror.gcr.io',
         help='Address of the Docker Hub mirror (default: mirror.gcr.io).',
     )
+    group_gc.add_argument(
+        '--gcp-cost-estimation',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            'Enable GCP cost estimation in Cromwell server mode. '
+            'Requires Cloud Billing API enabled on your GCP project. '
+            'Use --no-gcp-cost-estimation to disable.'
+        ),
+    )
+    group_gc.add_argument(
+        '--gcp-cost-catalog-expiry',
+        type=int,
+        default=86400,
+        help=(
+            'How long (seconds) Cromwell caches the GCP pricing catalog '
+            'before re-fetching from Cloud Billing API (default: 86400).'
+        ),
+    )
 
 
 def _add_aws_runner_args(parser: ArgumentParser) -> None:
@@ -891,6 +910,23 @@ def _create_parent_cleanup() -> ArgumentParser:
     return parser
 
 
+def _add_cost_args(parser: ArgumentParser) -> None:
+    group = parser.add_argument_group(title='cost command arguments')
+    group.add_argument(
+        '--format',
+        dest='cost_format',
+        choices=['human', 'tsv', 'json'],
+        default='human',
+        help='Output format for cost results (default: human).',
+    )
+
+
+def _create_parent_cost() -> ArgumentParser:
+    parser = argparse.ArgumentParser(add_help=False)
+    _add_cost_args(parser)
+    return parser
+
+
 def _create_parent_hpc_abort() -> ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
     _add_hpc_abort_args(parser)
@@ -964,6 +1000,7 @@ def get_parser_and_defaults(
     parent_gcp_res_analysis = _create_parent_gcp_res_analysis()
     parent_cleanup = _create_parent_cleanup()
     parent_hpc_abort = _create_parent_hpc_abort()
+    parent_cost = _create_parent_cost()
 
     # all subcommands
     p_init = subparser.add_parser(
@@ -1047,6 +1084,18 @@ def get_parser_and_defaults(
             parent_client,
             parent_search_wf,
             parent_troubleshoot,
+        ],
+    )
+
+    p_cost = subparser.add_parser(
+        'cost',
+        help='Get estimated GCP cost for workflows (server mode only).',
+        parents=[
+            parent_all,
+            parent_server_client,
+            parent_client,
+            parent_search_wf,
+            parent_cost,
         ],
     )
 
@@ -1135,6 +1184,7 @@ def get_parser_and_defaults(
         p_metadata,
         p_troubleshoot,
         p_debug,
+        p_cost,
         p_gcp_monitor,
         p_gcp_res_analysis,
         p_cleanup,

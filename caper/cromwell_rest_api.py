@@ -99,6 +99,7 @@ class CromwellRestAPI:
     ENDPOINT_SUBMIT = '/api/workflows/v1'
     ENDPOINT_ABORT = '/api/workflows/v1/{wf_id}/abort'
     ENDPOINT_RELEASE_HOLD = '/api/workflows/v1/{wf_id}/releaseHold'
+    ENDPOINT_COST = '/api/workflows/v1/{wf_id}/cost'
     DEFAULT_HOSTNAME = 'localhost'
     DEFAULT_PORT = 8000
 
@@ -301,6 +302,32 @@ class CromwellRestAPI:
             if m:
                 cm = CromwellMetadata(m)
                 result.append(cm.metadata)
+        return result
+
+    def get_cost(
+        self,
+        workflow_ids: list[str] | None = None,
+        labels: dict[str, str] | None = None,
+    ) -> list[dict] | None:
+        """Retrieve estimated cost for workflows matching workflow IDs or labels.
+
+        Args:
+            workflow_ids:
+                List of workflow IDs to find workflows matched.
+            labels:
+                List of Caper's string labels to find workflows matched.
+        """
+        valid_workflow_ids = self.find_valid_workflow_ids(workflow_ids=workflow_ids, labels=labels)
+        if valid_workflow_ids is None:
+            return None
+
+        result = []
+        for workflow_id in valid_workflow_ids:
+            r = self.__request_get(
+                CromwellRestAPI.ENDPOINT_COST.format(wf_id=workflow_id),
+            )
+            if r:
+                result.append(r)
         return result
 
     def get_labels(self, workflow_id: str) -> dict | None:
