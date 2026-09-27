@@ -138,7 +138,6 @@ def test_run_gcp_batch_api(
     if gcp_compute_service_account:
         cmd += ['--gcp-compute-service-account', gcp_compute_service_account]
     cmd += ['--gcp-region', 'us-central1']
-    # --gcp-zones should be ignored
     cmd += ['--gcp-zones', 'us-west1-a,us-west1-b']
     cmd += ['--gcp-prj', gcp_prj]
     cmd += ['--memory-retry-error-keys', 'Killed']
