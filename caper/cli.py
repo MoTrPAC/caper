@@ -228,6 +228,8 @@ def runner(args: Namespace, nonblocking_server: bool = False) -> NBSubprocThread
         postgresql_db_name=args.postgresql_db_name,
         gcp_prj=args.gcp_prj,
         gcp_region=args.gcp_region,
+        gcp_cost_estimation=args.action == 'server' and args.gcp_cost_estimation,
+        gcp_cost_catalog_expiry=args.gcp_cost_catalog_expiry,
         gcp_zones=args.gcp_zones,
         gcp_call_caching_dup_strat=args.gcp_call_caching_dup_strat,
         gcp_out_dir=args.gcp_out_dir,
@@ -321,6 +323,8 @@ def client(args: Namespace) -> None:
             subcmd_gcp_res_analysis(c, args)
         elif args.action == 'cleanup':
             subcmd_cleanup(c, args)
+        elif args.action == 'cost':
+            subcmd_cost(c, args)
         else:
             msg = f'Unsupported client action {args.action}'
             raise ValueError(msg)
@@ -520,6 +524,58 @@ def subcmd_metadata(caper_client: CaperClient, args: Namespace) -> None:
         msg = 'Found multiple workflow matching with search query.'
         raise ValueError(msg)
     print(json.dumps(m[0], indent=4))  # noqa: T201
+
+
+def _format_cost_human(results: list[dict[str, Any]]) -> None:
+    """Print cost results in human-readable format."""
+    has_warnings = False
+    total_cost = 0.0
+    for r in results:
+        cost = r['cost']
+        total_cost += cost
+        status = r['status']
+        wf_id = r['id']
+        print(f'  {wf_id}  {status:<12} ${cost:.2f}')  # noqa: T201
+        if r.get('errors'):
+            has_warnings = True
+
+    if len(results) > 1 or has_warnings:
+        print('  ' + '\u2500' * 60)  # noqa: T201
+        label = f'Total ({len(results)} workflows'
+        if has_warnings:
+            label += ', incomplete'
+        label += ')'
+        print(f'  {label:<50} ${total_cost:.2f}')  # noqa: T201
+
+    if has_warnings:
+        print()  # noqa: T201
+        print('Warnings:')  # noqa: T201
+        for r in results:
+            for err in r.get('errors', []):
+                short_id = r['id'][:8]
+                print(f'  {short_id}...: {err}')  # noqa: T201
+
+
+def subcmd_cost(caper_client: CaperClient, args: Namespace) -> None:
+    """Execute the cost subcommand."""
+    results = caper_client.cost(wf_ids_or_labels=args.wf_id_or_label)
+    if not results:
+        msg = 'Found no workflow matching with search query.'
+        raise ValueError(msg)
+
+    fmt = args.cost_format
+
+    if fmt == 'json':
+        print(json.dumps(results, indent=4))  # noqa: T201
+    elif fmt == 'tsv':
+        print('workflow_id\tstatus\tcost\tcurrency\terrors')  # noqa: T201
+        for r in results:
+            errors_str = '; '.join(r.get('errors', []))
+            print(  # noqa: T201
+                f'{r["id"]}\t{r["status"]}\t{r["cost"]}\t{r["currency"]}\t{errors_str}'
+            )
+    else:
+        _format_cost_human(results)
 
 
 def get_single_cromwell_metadata_obj(

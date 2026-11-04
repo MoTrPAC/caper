@@ -259,6 +259,30 @@ class CromwellBackendDatabase(UserDict):
             raise ValueError(msg)
 
 
+class CromwellBackendCostService(UserDict):
+    """Cromwell GCP cost estimation service configuration."""
+
+    DEFAULT_CATALOG_EXPIRY_SECONDS = 86400
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = False,
+        catalog_expiry_seconds: int = DEFAULT_CATALOG_EXPIRY_SECONDS,
+    ) -> None:
+        super().__init__()
+        if enabled:
+            self['services'] = {
+                'GcpCostCatalogService': {
+                    'class': 'cromwell.services.cost.GcpCostCatalogService',
+                    'config': {
+                        'enabled': True,
+                        'catalogExpirySeconds': catalog_expiry_seconds,
+                    },
+                }
+            }
+
+
 class CromwellBackendBase(UserDict):
     """Base skeleton backend for all backends."""
 

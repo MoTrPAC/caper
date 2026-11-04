@@ -1,4 +1,5 @@
 """Module for creating the Cromwell backend configuration file."""
+
 from __future__ import annotations
 
 import logging
@@ -14,6 +15,7 @@ from .cromwell_backend import (
     CromwellBackendAws,
     CromwellBackendBase,
     CromwellBackendCommon,
+    CromwellBackendCostService,
     CromwellBackendDatabase,
     CromwellBackendGcp,
     CromwellBackendLocal,
@@ -71,6 +73,8 @@ class CaperBackendConf:
         gcp_dockerhub_mirror: bool = True,
         gcp_dockerhub_mirror_address: str = 'mirror.gcr.io',
         gcp_region: str = CromwellBackendGcp.DEFAULT_REGION,
+        gcp_cost_estimation: bool = False,
+        gcp_cost_catalog_expiry: int = CromwellBackendCostService.DEFAULT_CATALOG_EXPIRY_SECONDS,
         aws_batch_arn: str | None = None,
         aws_region: str | None = None,
         aws_out_dir: str | None = None,
@@ -171,6 +175,10 @@ class CaperBackendConf:
                 Address of the Docker Hub mirror.
             gcp_region:
                 Region for Google Cloud Batch API.
+            gcp_cost_estimation:
+                Enable GCP cost estimation service in Cromwell.
+            gcp_cost_catalog_expiry:
+                How long (seconds) Cromwell caches the GCP pricing catalog.
             aws_batch_arn:
                 ARN for AWS Batch.
             aws_region:
@@ -332,6 +340,15 @@ class CaperBackendConf:
                     gcp_dockerhub_mirror=gcp_dockerhub_mirror,
                     gcp_dockerhub_mirror_address=gcp_dockerhub_mirror_address,
                     gcp_region=gcp_region,
+                ),
+            )
+
+        if gcp_cost_estimation:
+            merge_dict(
+                self._template,
+                CromwellBackendCostService(
+                    enabled=True,
+                    catalog_expiry_seconds=gcp_cost_catalog_expiry,
                 ),
             )
 

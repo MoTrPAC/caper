@@ -1,8 +1,9 @@
 """Client for interacting with Cromwell server."""
 
+from __future__ import annotations
+
 import logging
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from autouri import AutoURI
 
@@ -12,7 +13,12 @@ from .caper_wdl_parser import CaperWDLParser
 from .caper_workflow_opts import CaperWorkflowOpts
 from .cromwell import Cromwell
 from .cromwell_rest_api import CromwellRestAPI, has_wildcard, is_valid_uuid
-from .server_heartbeat import ServerHeartbeat
+
+if TYPE_CHECKING:
+    import builtins
+    from collections.abc import Sequence
+
+    from .server_heartbeat import ServerHeartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +111,7 @@ class CaperClient(CaperBase):
 
     def list(
         self, wf_ids_or_labels: Sequence[str] | None = None, exclude_subworkflow: bool = True
-    ) -> list[dict[str, Any]] | None:
+    ) -> builtins.list[dict[str, Any]] | None:
         """
         Retrieves list of running/pending workflows from a Cromwell server.
 
@@ -152,6 +158,24 @@ class CaperClient(CaperBase):
         return self._cromwell_rest_api.get_metadata(
             workflow_ids, labels, embed_subworkflow=embed_subworkflow
         )
+
+    def cost(
+        self,
+        wf_ids_or_labels: Sequence[str],
+    ) -> builtins.list[dict[str, Any]] | None:
+        """Retrieve estimated costs for workflows from a Cromwell server.
+
+        Args:
+            wf_ids_or_labels:
+                List of workflow IDs or string labels (Caper's string label).
+                Wildcards (*, ?) are allowed.
+
+        Returns:
+            List of cost response dicts for matched workflows.
+        """
+        workflow_ids, labels = self._split_workflow_ids_and_labels(wf_ids_or_labels)
+
+        return self._cromwell_rest_api.get_cost(workflow_ids, labels)
 
     def _split_workflow_ids_and_labels(
         self, workflow_ids_or_labels: Sequence[str] | None
