@@ -20,7 +20,8 @@ def make_caper_run_command_for_hpc_submit() -> list[str]:
 
     Makes `caper run ...` command from `caper hpc submit` command by simply
     replacing `caper hpc submit` with `caper run`.
-    This also escapes double quotes in caper run command.
+    Arguments are returned as a list (not quoted). `HpcWrapper.submit()` quotes them
+    with `shlex.join()` when writing the leader job script.
     """
     if sys.argv[1] == 'hpc' and sys.argv[2] == 'submit':
         # Replace "caper hpc submit" with "caper run"

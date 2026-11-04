@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -64,7 +65,7 @@ class HpcWrapper(ABC):
         """
         home_dir = f'{Path.home()!s}{os.sep}'
         with NamedTemporaryFile(prefix=home_dir, suffix='.sh') as shell_script:
-            contents = make_bash_script_contents(' '.join(caper_run_command))
+            contents = make_bash_script_contents(shlex.join(caper_run_command))
             shell_script.write(contents.encode())
             shell_script.flush()
 
