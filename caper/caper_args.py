@@ -1052,17 +1052,17 @@ def get_parser_and_defaults(
 
     p_hpc = subparser.add_parser('hpc', help='Subcommand for HPCs', parents=[parent_all])
     subparser_hpc = p_hpc.add_subparsers(dest='hpc_action')
-    subparser_hpc.add_parser(
+    p_hpc_submit = subparser_hpc.add_parser(
         'submit',
         help='Submit a single workflow to HPC.',
         parents=[parent_all, parent_submit, parent_run, parent_runner, parent_backend],
     )
-    subparser_hpc.add_parser(
+    p_hpc_list = subparser_hpc.add_parser(
         'list',
         help='List all workflows submitted to HPC.',
         parents=[parent_all, parent_backend],
     )
-    subparser_hpc.add_parser(
+    p_hpc_abort = subparser_hpc.add_parser(
         'abort',
         help='Abort a workflow submitted to HPC.',
         parents=[parent_all, parent_backend, parent_hpc_abort],
@@ -1138,6 +1138,9 @@ def get_parser_and_defaults(
         p_gcp_monitor,
         p_gcp_res_analysis,
         p_cleanup,
+        p_hpc_submit,
+        p_hpc_list,
+        p_hpc_abort,
     ]
     if os.path.exists(conf_file):
         conf_dict = update_parsers_defaults_with_conf(
