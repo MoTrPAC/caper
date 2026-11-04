@@ -1,8 +1,9 @@
 """Client for interacting with Cromwell server."""
 
+from __future__ import annotations
+
 import logging
-from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from autouri import AutoURI
 
@@ -12,7 +13,12 @@ from .caper_wdl_parser import CaperWDLParser
 from .caper_workflow_opts import CaperWorkflowOpts
 from .cromwell import Cromwell
 from .cromwell_rest_api import CromwellRestAPI, has_wildcard, is_valid_uuid
-from .server_heartbeat import ServerHeartbeat
+
+if TYPE_CHECKING:
+    import builtins
+    from collections.abc import Sequence
+
+    from .server_heartbeat import ServerHeartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +111,7 @@ class CaperClient(CaperBase):
 
     def list(
         self, wf_ids_or_labels: Sequence[str] | None = None, exclude_subworkflow: bool = True
-    ) -> list[dict[str, Any]] | None:
+    ) -> builtins.list[dict[str, Any]] | None:
         """
         Retrieves list of running/pending workflows from a Cromwell server.
 
@@ -156,7 +162,7 @@ class CaperClient(CaperBase):
     def cost(
         self,
         wf_ids_or_labels: Sequence[str],
-    ) -> list[dict[str, Any]] | None:
+    ) -> builtins.list[dict[str, Any]] | None:
         """Retrieve estimated costs for workflows from a Cromwell server.
 
         Args:
