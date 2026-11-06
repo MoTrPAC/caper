@@ -11,7 +11,7 @@ import pytest
 
 from caper import hpc
 from caper.caper_args import get_parser_and_defaults
-from caper.cli_hpc import make_caper_run_command_for_hpc_submit, subcmd_hpc
+from caper.cli_hpc import subcmd_hpc
 from caper.hpc import SlurmWrapper
 
 BASH = shutil.which('bash')
@@ -45,13 +45,16 @@ def home_dir(tmp_path, monkeypatch):
 def capture_slurm(monkeypatch):
     """Capture the sbatch command line and the leader job script instead of running sbatch."""
     captured = {}
+    real_run = subprocess.run
 
-    def fake_run_command(_self, command):
+    def fake_run(command, **kwargs):
+        if command[0] != 'sbatch':
+            return real_run(command, **kwargs)
         captured['command'] = command
         captured['script'] = Path(command[-1]).read_text()
-        return 'Submitted batch job 1'
+        return subprocess.CompletedProcess(command, 0, stdout=b'Submitted batch job 1\n')
 
-    monkeypatch.setattr(SlurmWrapper, '_run_command', fake_run_command)
+    monkeypatch.setattr(hpc.subprocess, 'run', fake_run)
     return captured
 
 
@@ -77,11 +80,6 @@ def test_leader_job_script_keeps_args_with_spaces(capture_slurm) -> None:
         check=True,
     )
     assert result.stdout.splitlines() == ARGS_WITH_SPACES
-
-
-def test_make_caper_run_command_for_hpc_submit(monkeypatch) -> None:
-    monkeypatch.setattr(sys, 'argv', ['caper', 'hpc', 'submit', *ARGS_WITH_SPACES])
-    assert make_caper_run_command_for_hpc_submit() == ['caper', 'run', *ARGS_WITH_SPACES]
 
 
 @pytest.mark.parametrize(
